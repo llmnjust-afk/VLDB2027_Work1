@@ -1,0 +1,23 @@
+\label{sec:parallel}
+
+\paragraph{Threading structure}
+The implementation is a single C++ program built around a persistent work-stealing thread pool of $T$ threads; the graph lives in a sorted-CSR structure with per-edge trussness and support arrays, and all phases run in shared memory.
+Per batch, the following phases are parallel:
+(i) witness enumeration, where each batch edge is an independent task whose triangle scan is a sorted-list intersection of the endpoints' adjacency lists;
+(ii) region closure, a parallel BFS in which region membership is a fetch-and-add mark and the frontier is split across threads;
+(iii) the recount, which assigns each region edge to a thread and writes per-edge support counts without synchronization;
+(iv) event collection, which merges the per-edge boundary scans into a deduplicated, bucket-sorted event list.
+The peeling sweep itself is sequential: it reproduces Wang and Cheng's~\cite{wang2012truss} pop order on the region, whose work is proportional to the region rather than the graph.
+We made this choice deliberately after measuring both variants: parallelizing the sweep with atomics reintroduced contention that cost more than the sweep's work saved, because the sweep's per-pop triangle scan is short once the region is small, and the sequential core leaves the shared arrays in a deterministic state that simplifies the differential testing harness.
+The phases that touch $O(|b|+|R|+\Delta)$ inputs---which dominate end-to-end batch latency on community graphs---are all parallel and scale with $T$.
+
+\paragraph{Memory and data structures}
+The edge-id map, adjacency, trussness, support, and per-batch scratch arrays are all preallocated once at load time and resized only when the closure reveals edges whose structures must grow.
+Batch-scratch state (witness deltas, region marks, event marker array, buckets) is cleared at the end of each batch with an O(1) reset via generation stamps, so per-batch cleanup is proportional to touched edges only.
+The peeling sweep reuses the static implementation's stamping device: a single stamp counter per position marks visited vertices during a pop's triangle scan, avoiding per-pop allocation and making the scan cache-friendly.
+
+\paragraph{Exactness harness}
+Correctness is enforced by an executable harness compiled from the same source tree.
+For each stream, the harness maintains the decomposition incrementally and, after every batch (controlled workloads) or every checkpoint (large streams), compares the maintained assignment against a from-scratch static peeling of the current graph.
+The harness exercises three code paths---the batch algorithm, the same algorithm with region merging disabled, and the sequential per-edge baseline---and reports the maximum trussness error, the number of affected edges, and the number of support evaluations per batch.
+Randomized graphs with adversarial degree profiles, adversarial batches (all deletions, all insertions, mixed, re-insertions), and eight real-world graphs are covered; every workload reported in \Cref{sec:experiments} passed with zero error.

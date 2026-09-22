@@ -1,0 +1,578 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{34}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{}, \showDOI{}, and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showDOI}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showDOI #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showDOI      \undefined \def \showDOI       #1{#1}\fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       {\relax}        \fi
+% The following commands are used for tagged output and should be
+% invisible to TeX
+\providecommand\bibfield[2]{#2}
+\providecommand\bibinfo[2]{#2}
+\providecommand\natexlab[1]{#1}
+\providecommand\showeprint[2][]{arXiv:#2}
+
+\bibitem[\protect\citeauthoryear{Arafat, Khan, Rai, and Ghosh}{Arafat
+  et~al\mbox{.}}{2023}]%
+        {arafat2023neighborhoodbased}
+\bibfield{author}{\bibinfo{person}{Naheed~Anjum Arafat},
+  \bibinfo{person}{Arijit Khan}, \bibinfo{person}{Arpit~Kumar Rai}, {and}
+  \bibinfo{person}{Bishwamittra Ghosh}.} \bibinfo{year}{2023}\natexlab{}.
+\newblock \bibinfo{title}{Neighborhood-based Hypergraph Core Decomposition}.
+\newblock \bibinfo{howpublished}{arXiv:2301.06426}.
+\newblock
+\showeprint[arxiv]{2301.06426}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2301.06426v2}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Behrouz, Hashemi, and Lakshmanan}{Behrouz
+  et~al\mbox{.}}{2022}]%
+        {behrouz2022firmtruss}
+\bibfield{author}{\bibinfo{person}{Ali Behrouz}, \bibinfo{person}{Farnoosh
+  Hashemi}, {and} \bibinfo{person}{Laks V.~S. Lakshmanan}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{FirmTruss Community Search in Multilayer Networks}.
+\newblock \bibinfo{howpublished}{arXiv:2205.00742}.
+\newblock  (\bibinfo{year}{2022}).
+\newblock
+\showeprint[arxiv]{2205.00742}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2205.00742v2}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Burkhardt, Faber, and Harris}{Burkhardt
+  et~al\mbox{.}}{2020}]%
+        {burkhardt2018bounds}
+\bibfield{author}{\bibinfo{person}{Paul Burkhardt}, \bibinfo{person}{Vance
+  Faber}, {and} \bibinfo{person}{David Harris}.}
+  \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Bounds and algorithms for graph trusses}.
+\newblock \bibinfo{journal}{\emph{Journal of Graph Algorithms and
+  Applications}} \bibinfo{volume}{24}, \bibinfo{number}{3}
+  (\bibinfo{year}{2020}), \bibinfo{pages}{191--214}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.7155/jgaa.00527}
+\showDOI{\tempurl}
+\showeprint[arxiv]{1806.05523}
+
+
+\bibitem[\protect\citeauthoryear{Chand, Das, and Molla}{Chand
+  et~al\mbox{.}}{2024}]%
+        {chand2024agentbased}
+\bibfield{author}{\bibinfo{person}{Prabhat~Kumar Chand},
+  \bibinfo{person}{Apurba Das}, {and} \bibinfo{person}{Anisur~Rahaman Molla}.}
+  \bibinfo{year}{2024}\natexlab{}.
+\newblock \showarticletitle{Agent-Based Triangle Counting: Unlocking Truss
+  Decomposition, Triangle Centrality, and Local Clustering Coefficient}. In
+  \bibinfo{booktitle}{\emph{arXiv (Cornell University)}}.
+  \bibinfo{publisher}{Cornell University}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.48550/arxiv.2402.03653}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Che, Lai, Sun, Wang, and Luo}{Che
+  et~al\mbox{.}}{2020}]%
+        {che2020accelerating}
+\bibfield{author}{\bibinfo{person}{Yulin Che}, \bibinfo{person}{Zhuohang Lai},
+  \bibinfo{person}{Shixuan Sun}, \bibinfo{person}{Yue Wang}, {and}
+  \bibinfo{person}{Qiong Luo}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Accelerating truss decomposition on heterogeneous
+  processors}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the VLDB Endowment}}
+  \bibinfo{volume}{13}, \bibinfo{number}{10} (\bibinfo{year}{2020}),
+  \bibinfo{pages}{1751--1764}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.14778/3401960.3401971}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Chen, Qian, Luo, Li, and Wang}{Chen
+  et~al\mbox{.}}{2024}]%
+        {chen2024parallel}
+\bibfield{author}{\bibinfo{person}{Chen Chen}, \bibinfo{person}{Jingya Qian},
+  \bibinfo{person}{Hui Luo}, \bibinfo{person}{Yongye Li}, {and}
+  \bibinfo{person}{Xiaoyang Wang}.} \bibinfo{year}{2024}\natexlab{}.
+\newblock \bibinfo{title}{Parallel Higher-order Truss Decomposition}.
+\newblock \bibinfo{howpublished}{arXiv:2411.06405}.
+\newblock
+\showeprint[arxiv]{2411.06405}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2411.06405v1}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Chen, Yuan, Han, and Qian}{Chen
+  et~al\mbox{.}}{2023}]%
+        {chen2021higherorder}
+\bibfield{author}{\bibinfo{person}{Zi Chen}, \bibinfo{person}{Long Yuan},
+  \bibinfo{person}{Li Han}, {and} \bibinfo{person}{Zhengping Qian}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Higher-Order Truss Decomposition in Graphs}.
+\newblock \bibinfo{journal}{\emph{IEEE Transactions on Knowledge and Data
+  Engineering}} \bibinfo{volume}{35}, \bibinfo{number}{4}
+  (\bibinfo{year}{2023}), \bibinfo{pages}{3966--3978}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/tkde.2021.3137955}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Cohen}{Cohen}{2019}]%
+        {cohen2019trusses}
+\bibfield{author}{\bibinfo{person}{Jonathan~D. Cohen}.}
+  \bibinfo{year}{2019}\natexlab{}.
+\newblock \bibinfo{title}{Trusses and Trapezes: Easily-Interpreted Communities
+  in Social Networks}.
+\newblock \bibinfo{howpublished}{arXiv:1907.09417}.
+\newblock
+\showeprint[arxiv]{1907.09417}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/1907.09417v1}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Conte, Sensi, Grossi, Marino, and
+  Versari}{Conte et~al\mbox{.}}{2020}]%
+        {conte2020truly}
+\bibfield{author}{\bibinfo{person}{Alessio Conte}, \bibinfo{person}{Daniele~De
+  Sensi}, \bibinfo{person}{Roberto Grossi}, \bibinfo{person}{Andrea Marino},
+  {and} \bibinfo{person}{Luca Versari}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Truly Scalable K-Truss and Max-Truss Algorithms for
+  Community Detection in Graphs}.
+\newblock \bibinfo{journal}{\emph{IEEE Access}}  \bibinfo{volume}{8}
+  (\bibinfo{year}{2020}), \bibinfo{pages}{139096--139109}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/ACCESS.2020.3011667}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Couto and Fernandes}{Couto and
+  Fernandes}{2025}]%
+        {couto2025hardness}
+\bibfield{author}{\bibinfo{person}{Yan~S. Couto} {and}
+  \bibinfo{person}{Cristina~G. Fernandes}.} \bibinfo{year}{2025}\natexlab{}.
+\newblock \showarticletitle{Hardness of Dynamic Core and Truss Decompositions}.
+  In \bibinfo{booktitle}{\emph{Approximation and Online Algorithms}}.
+  \bibinfo{publisher}{Springer Nature Switzerland}, \bibinfo{pages}{64--80}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/978-3-032-06706-7_5}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Dhulipala, Li, and Liu}{Dhulipala
+  et~al\mbox{.}}{2023}]%
+        {dhulipala2023nearoptimal}
+\bibfield{author}{\bibinfo{person}{Laxman Dhulipala},
+  \bibinfo{person}{George~Z. Li}, {and} \bibinfo{person}{Quanquan~C. Liu}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \bibinfo{title}{Near-Optimal Differentially Private k-Core
+  Decomposition}.
+\newblock \bibinfo{howpublished}{arXiv:2312.07706}.
+\newblock
+\showeprint[arxiv]{2312.07706}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2312.07706v2}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Gabert, Pınar, and Ümit
+  V.~Çatalyürek}{Gabert et~al\mbox{.}}{2022}]%
+        {gabert2022batch}
+\bibfield{author}{\bibinfo{person}{Kasimir Gabert}, \bibinfo{person}{Ali
+  Pınar}, {and} \bibinfo{person}{Ümit V.~Çatalyürek}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Batch Dynamic Algorithm to Find k-Cores and
+  Hierarchies}.
+\newblock \bibinfo{howpublished}{arXiv:2203.13095}.
+\newblock  (\bibinfo{year}{2022}).
+\newblock
+\showeprint[arxiv]{2203.13095}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2203.13095v1}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Guo and Sekerinski}{Guo and
+  Sekerinski}{2023}]%
+        {guo2022parallel}
+\bibfield{author}{\bibinfo{person}{Bin Guo} {and} \bibinfo{person}{Emil
+  Sekerinski}.} \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Parallel Order-Based Core Maintenance in Dynamic
+  Graphs}. In \bibinfo{booktitle}{\emph{Proceedings of the 52nd International
+  Conference on Parallel Processing}}. \bibinfo{publisher}{ACM},
+  \bibinfo{pages}{122--131}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3605573.3605597}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Hu, Zhong, and Li}{Hu et~al\mbox{.}}{2026}]%
+        {hu2026querying}
+\bibfield{author}{\bibinfo{person}{Chuhan Hu}, \bibinfo{person}{Ming Zhong},
+  {and} \bibinfo{person}{Lei Li}.} \bibinfo{year}{2026}\natexlab{}.
+\newblock \showarticletitle{Querying Cohesive Subgraph regarding
+  Span-Constrained Triangles on Temporal Graphs with Dynamic Index
+  Maintenance}. In \bibinfo{booktitle}{\emph{arXiv (Cornell University)}}.
+  \bibinfo{publisher}{Cornell University}.
+\newblock
+\urldef\tempurl%
+\url{https://arxiv.org/pdf/2606.11582}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Huang and Lakshmanan}{Huang and
+  Lakshmanan}{2016}]%
+        {huang2016attribute}
+\bibfield{author}{\bibinfo{person}{Xin Huang} {and} \bibinfo{person}{Laks V.~S.
+  Lakshmanan}.} \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{Attribute Truss Community Search}.
+\newblock \bibinfo{howpublished}{arXiv:1609.00090}.
+\newblock  (\bibinfo{year}{2016}).
+\newblock
+\showeprint[arxiv]{1609.00090}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/1609.00090v3}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Jakkula and Karypis}{Jakkula and
+  Karypis}{2019}]%
+        {jakkula2019streaming}
+\bibfield{author}{\bibinfo{person}{Venkata~Rohit Jakkula} {and}
+  \bibinfo{person}{George Karypis}.} \bibinfo{year}{2019}\natexlab{}.
+\newblock \bibinfo{title}{Streaming and Batch Algorithms for Truss
+  Decomposition}.
+\newblock \bibinfo{howpublished}{arXiv:1908.10550}.
+\newblock
+\showeprint[arxiv]{1908.10550}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/1908.10550v1}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Kabir and Madduri}{Kabir and Madduri}{2017}]%
+        {kabir2017sharedmemory}
+\bibfield{author}{\bibinfo{person}{Humayun Kabir} {and} \bibinfo{person}{Kamesh
+  Madduri}.} \bibinfo{year}{2017}\natexlab{}.
+\newblock \bibinfo{title}{Shared-memory Graph Truss Decomposition}.
+\newblock \bibinfo{howpublished}{arXiv:1707.02000}.
+\newblock
+\showeprint[arxiv]{1707.02000}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/1707.02000v1}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Lanciano, Miyauchi, Fazzone, and
+  Bonchi}{Lanciano et~al\mbox{.}}{2024}]%
+        {lanciano2024survey}
+\bibfield{author}{\bibinfo{person}{Tommaso Lanciano}, \bibinfo{person}{Atsushi
+  Miyauchi}, \bibinfo{person}{Adriano Fazzone}, {and}
+  \bibinfo{person}{Francesco Bonchi}.} \bibinfo{year}{2024}\natexlab{}.
+\newblock \showarticletitle{A Survey on the Densest Subgraph Problem and its
+  Variants}.
+\newblock \bibinfo{journal}{\emph{Comput. Surveys}} \bibinfo{volume}{56},
+  \bibinfo{number}{8} (\bibinfo{year}{2024}), \bibinfo{pages}{1--40}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3653298}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Liu, Shi, Yu, Dhulipala, and Shun}{Liu
+  et~al\mbox{.}}{2022}]%
+        {liu2022parallel}
+\bibfield{author}{\bibinfo{person}{Quanquan~C. Liu}, \bibinfo{person}{Jessica
+  Shi}, \bibinfo{person}{Shangdi Yu}, \bibinfo{person}{Laxman Dhulipala}, {and}
+  \bibinfo{person}{Julian Shun}.} \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Parallel Batch-Dynamic Algorithms for k-Core
+  Decomposition and Related Graph Problems}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 34th ACM Symposium on
+  Parallelism in Algorithms and Architectures}}. \bibinfo{publisher}{ACM},
+  \bibinfo{pages}{191--204}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3490148.3538569}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Liu, Shun, and Zablotchi}{Liu
+  et~al\mbox{.}}{2024}]%
+        {liu2024parallel}
+\bibfield{author}{\bibinfo{person}{Quanquan~C. Liu}, \bibinfo{person}{Julian
+  Shun}, {and} \bibinfo{person}{Igor Zablotchi}.}
+  \bibinfo{year}{2024}\natexlab{}.
+\newblock \showarticletitle{Parallel k-Core Decomposition with Batched Updates
+  and Asynchronous Reads}.
+\newblock \bibinfo{howpublished}{arXiv:2409.19935}.
+\newblock  (\bibinfo{year}{2024}).
+\newblock
+\showeprint[arxiv]{2409.19935}
+
+
+\bibitem[\protect\citeauthoryear{Liu, Dong, Gu, and Sun}{Liu
+  et~al\mbox{.}}{2025}]%
+        {liu2025parallel}
+\bibfield{author}{\bibinfo{person}{Youzhe Liu}, \bibinfo{person}{Xiaojun Dong},
+  \bibinfo{person}{Yan Gu}, {and} \bibinfo{person}{Yihan Sun}.}
+  \bibinfo{year}{2025}\natexlab{}.
+\newblock \showarticletitle{Parallel k-Core Decomposition: Theory and
+  Practice}. In \bibinfo{booktitle}{\emph{Proceedings of the ACM on Management
+  of Data}}, Vol.~\bibinfo{volume}{3}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{pages}{1--27}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3725332}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Lotito and Montresor}{Lotito and
+  Montresor}{2020}]%
+        {lotito2020efficient}
+\bibfield{author}{\bibinfo{person}{Quintino~Francesco Lotito} {and}
+  \bibinfo{person}{Alberto Montresor}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \bibinfo{title}{Efficient Algorithms to Mine Maximal Span-Trusses
+  From Temporal Graphs}.
+\newblock \bibinfo{howpublished}{International Workshop on Mining and Learning
+  with Graphs 2020 (MLG '20)}.
+\newblock
+\showeprint[arxiv]{2009.01928}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2009.01928v2}
+\showURL{%
+\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Luo, Ma, Fang, and Lakshman}{Luo
+  et~al\mbox{.}}{2023a}]%
+        {luo2023survey}
+\bibfield{author}{\bibinfo{person}{Wensheng Luo}, \bibinfo{person}{Chenhao Ma},
+  \bibinfo{person}{Yixiang Fang}, {and} \bibinfo{person}{Laks V.~S. Lakshman}.}
+  \bibinfo{year}{2023}\natexlab{a}.
+\newblock \showarticletitle{A Survey of Densest Subgraph Discovery on Large
+  Graphs}.
+\newblock  (\bibinfo{year}{2023}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.48550/arxiv.2306.07927}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Luo, Yang, Fang, and Zhou}{Luo
+  et~al\mbox{.}}{2023b}]%
+        {luo2023efficient}
+\bibfield{author}{\bibinfo{person}{Wensheng Luo}, \bibinfo{person}{Qiaoyuan
+  Yang}, \bibinfo{person}{Yixiang Fang}, {and} \bibinfo{person}{Xu Zhou}.}
+  \bibinfo{year}{2023}\natexlab{b}.
+\newblock \showarticletitle{Efficient Core Maintenance in Large Bipartite
+  Graphs}. In \bibinfo{booktitle}{\emph{Proceedings of the ACM on Management of
+  Data}}, Vol.~\bibinfo{volume}{1}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{pages}{1--26}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3617329}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Mo, Luo, Yu, Sheng, Yu, and Cheng}{Mo
+  et~al\mbox{.}}{2023}]%
+        {mo2023distributed}
+\bibfield{author}{\bibinfo{person}{Ziwei Mo}, \bibinfo{person}{Qi Luo},
+  \bibinfo{person}{Dongxiao Yu}, \bibinfo{person}{Hao Sheng},
+  \bibinfo{person}{Jiguo Yu}, {and} \bibinfo{person}{Xiuzhen Cheng}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Distributed Truss Computation in Dynamic Graphs}.
+\newblock \bibinfo{journal}{\emph{Tsinghua Science and Technology}}
+  \bibinfo{volume}{28}, \bibinfo{number}{5} (\bibinfo{year}{2023}),
+  \bibinfo{pages}{873--887}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.26599/tst.2022.9010019}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Sarıyüce}{Sarıyüce}{2025}]%
+        {saryce2025powerful}
+\bibfield{author}{\bibinfo{person}{Ahmet~Erdem Sarıyüce}.}
+  \bibinfo{year}{2025}\natexlab{}.
+\newblock \showarticletitle{A powerful lens for temporal network analysis:
+  temporal motifs}.
+\newblock \bibinfo{journal}{\emph{Discover Data}} \bibinfo{volume}{3},
+  \bibinfo{number}{1} (\bibinfo{year}{2025}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s44248-025-00032-8}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Shi, Dhulipala, and Shun}{Shi
+  et~al\mbox{.}}{2023}]%
+        {shi2023parallel}
+\bibfield{author}{\bibinfo{person}{Jessica Shi}, \bibinfo{person}{Laxman
+  Dhulipala}, {and} \bibinfo{person}{Julian Shun}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Parallel Algorithms for Hierarchical Nucleus
+  Decomposition}.
+\newblock  (\bibinfo{year}{2023}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.48550/arxiv.2306.08623}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Smith, Liu, Ahmed, Tom, Petrini, and
+  Karypis}{Smith et~al\mbox{.}}{2017}]%
+        {smith2017truss}
+\bibfield{author}{\bibinfo{person}{Shaden Smith}, \bibinfo{person}{Xing Liu},
+  \bibinfo{person}{Nesreen~K. Ahmed}, \bibinfo{person}{Ancy~Sarah Tom},
+  \bibinfo{person}{Fabrizio Petrini}, {and} \bibinfo{person}{George Karypis}.}
+  \bibinfo{year}{2017}\natexlab{}.
+\newblock \showarticletitle{Truss decomposition on shared-memory parallel
+  systems}. In \bibinfo{booktitle}{\emph{2017 IEEE High Performance Extreme
+  Computing Conference (HPEC)}}. \bibinfo{publisher}{IEEE},
+  \bibinfo{pages}{1--6}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/hpec.2017.8091049}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Sun, Huang, Liu, and Xu}{Sun
+  et~al\mbox{.}}{2023}]%
+        {sun2023efficient}
+\bibfield{author}{\bibinfo{person}{Zitan Sun}, \bibinfo{person}{Xin Huang},
+  \bibinfo{person}{Qing Liu}, {and} \bibinfo{person}{Jianliang Xu}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Efficient Star-based Truss Maintenance on Dynamic
+  Graphs}. In \bibinfo{booktitle}{\emph{Proceedings of the ACM on Management of
+  Data}}, Vol.~\bibinfo{volume}{1}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{pages}{1--26}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3589278}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Sun, Huang, Xu, Bonchi, and Chang}{Sun
+  et~al\mbox{.}}{2025}]%
+        {sun2025probabilistic}
+\bibfield{author}{\bibinfo{person}{Zitan Sun}, \bibinfo{person}{Xin Huang},
+  \bibinfo{person}{Jianliang Xu}, \bibinfo{person}{Francesco Bonchi}, {and}
+  \bibinfo{person}{Lijun Chang}.} \bibinfo{year}{2025}\natexlab{}.
+\newblock \showarticletitle{Probabilistic Truss Decomposition on Uncertain
+  Graphs: Indexing and Dynamic Maintenance}.
+\newblock \bibinfo{journal}{\emph{ACM Transactions on Database Systems}}
+  \bibinfo{volume}{50}, \bibinfo{number}{2} (\bibinfo{year}{2025}),
+  \bibinfo{pages}{1--40}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3721428}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Wang and Cheng}{Wang and Cheng}{2012}]%
+        {wang2012truss}
+\bibfield{author}{\bibinfo{person}{Jia Wang} {and} \bibinfo{person}{James
+  Cheng}.} \bibinfo{year}{2012}\natexlab{}.
+\newblock \showarticletitle{Truss decomposition in massive networks}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the VLDB Endowment}}
+  \bibinfo{volume}{5}, \bibinfo{number}{9} (\bibinfo{year}{2012}),
+  \bibinfo{pages}{812--823}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.14778/2311906.2311909}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Wu, Goshulak, Srinivasan, and Thomo}{Wu
+  et~al\mbox{.}}{2018}]%
+        {wu2018ktruss}
+\bibfield{author}{\bibinfo{person}{Jian Wu}, \bibinfo{person}{Alison Goshulak},
+  \bibinfo{person}{Venkatesh Srinivasan}, {and} \bibinfo{person}{Alex Thomo}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{K-Truss Decomposition of Large Networks on a Single
+  Consumer-Grade Machine}. In \bibinfo{booktitle}{\emph{2018 IEEE/ACM
+  International Conference on Advances in Social Networks Analysis and Mining
+  (ASONAM)}}. \bibinfo{publisher}{IEEE}, \bibinfo{pages}{873--880}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/asonam.2018.8508642}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Zheng, Zhang, Luo, Xie, and Yu}{Zheng
+  et~al\mbox{.}}{2023}]%
+        {zheng2023trussbased}
+\bibfield{author}{\bibinfo{person}{Yanwei Zheng}, \bibinfo{person}{Zichun
+  Zhang}, \bibinfo{person}{Qi Luo}, \bibinfo{person}{Zhenzhen Xie}, {and}
+  \bibinfo{person}{Dongxiao Yu}.} \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{A Truss-Based Framework for Graph Similarity
+  Computation}.
+\newblock \bibinfo{journal}{\emph{Journal of Database Management}}
+  \bibinfo{volume}{34}, \bibinfo{number}{1} (\bibinfo{year}{2023}),
+  \bibinfo{pages}{1--18}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.4018/jdm.322087}
+\showDOI{\tempurl}
+
+
+\bibitem[\protect\citeauthoryear{Zhou, Liu, Yu, Liang, and Zhang}{Zhou
+  et~al\mbox{.}}{2014}]%
+        {zhou2014efficient}
+\bibfield{author}{\bibinfo{person}{Rui~Hong Zhou}, \bibinfo{person}{Chengfei
+  Liu}, \bibinfo{person}{Jeffrey~Xu Yu}, \bibinfo{person}{Weifa Liang}, {and}
+  \bibinfo{person}{Yanchun Zhang}.} \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{Efficient Truss Maintenance in Evolving Networks}.
+\newblock \bibinfo{howpublished}{arXiv:1402.2807}.
+\newblock  (\bibinfo{year}{2014}).
+\newblock
+\showeprint[arxiv]{1402.2807}
+
+
+\end{thebibliography}

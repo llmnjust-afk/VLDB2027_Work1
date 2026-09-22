@@ -1,0 +1,30 @@
+\label{sec:background}
+
+We consider an undirected graph $G=(V,E)$ with $n=|V|$ vertices and $m=|E|$ edges; our implementation stores $G$ in a sorted-CSR adjacency structure with an edge-id map.
+A \emph{triangle} is a triple of mutually adjacent vertices, and two edges of a triangle are called each other's \emph{truss mates} on that triangle.
+The \emph{support} of an edge~$e$, written $\sup(e)$, is the number of triangles containing~$e$.
+For $k\ge 2$, the \emph{$k$-truss} of $G$ is the maximal edge set $G_k\subseteq E$ such that every edge in $G_k$ participates in at least $k-2$ triangles whose remaining edges also lie in $G_k$.
+The \emph{trussness} $\tau(e)$ of an edge~$e$ is the largest~$k$ such that $e$ lies in the $k$-truss; the \emph{$k$-truss decomposition} assigns every edge its trussness, an assignment that refines the $k$-core hierarchy and captures cohesion more faithfully than degree-based notions~\cite{wang2012truss,burkhardt2018bounds}.
+An edge with $\tau(e)=2$ lies in no triangle; isolated from cohesive structure, such edges are the periphery of the graph.
+
+\begin{definition}[Peeling decomposition]
+\label{def:peeling}
+Process edges in increasing order of support in the residual graph: repeatedly remove an edge $e$ whose current support equals the current peel value $s$, set $\tau(e)=s+2$, and decrement the support of every surviving mate of $e$ on each of its triangles.
+\end{definition}
+
+The classical algorithm of Wang and Cheng~\cite{wang2012truss} realizes \Cref{def:peeling} with a bucket structure: initially $\mathrm{bucket}[e]=\sup(e)$; whenever the sweep reaches support value $s$, the bucket indexed by $s$ holds exactly the edges of trussness $s+2$, and each removal pushes decremented mates into lower buckets.
+The decomposition is exact because trussness is a fixed point of this contraction: if an edge $e$ survives peeling through support value $s$, then $e$ lies in a triangle whose other two edges also survive, and by induction the surviving subgraph at level $s+2$ is precisely the $k$-truss.
+Both the shared-memory truss decompositions of Kabir and Madduri~\cite{kabir2017sharedmemory} and Smith et al.~\cite{smith2017truss} and the heterogeneous acceleration of Che et al.~\cite{che2020accelerating} implement this peeling; their optimizations target throughput on static snapshots.
+
+\paragraph{Dynamic maintenance}
+The maintenance problem maintains a graph $G$ and its exact decomposition under a stream of updates, each either an insertion of an edge absent from $G$ or a deletion of an edge present in $G$.
+We call a stream \emph{batched} if updates are delivered in batches $b_1,b_2,\dots$, where batch $b_i$ contains an arbitrary mixture of insertions and deletions; we do not assume the batch is homogeneous, that the batch is small relative to the graph, or that the same edge appears at most once per batch (re-inserting a deleted edge within one batch is handled naturally by ordering insertions before deletions in the witness phase, \Cref{sec:method-region}).
+We require the maintained assignment to be \emph{exact}: after every batch, $\tau(e)$ equals the trussness of $e$ in the current graph, for every $e$.
+
+Two quantities govern the difficulty.
+First, the set of edges whose trussness may change under a batch is not the batch itself: deleting one edge can demote an entire community, and inserting one edge can promote a whole clique, and the change propagates through truss-mate adjacency.
+Second, the maintained decomposition after each batch is compared against a \emph{ground truth} recomputed by a full static peeling (\Cref{def:peeling}) run on the current graph; our testing harness uses this oracle after every batch on controlled workloads and after checkpoints on large streams.
+
+Throughout, $\tau$ denotes the maintained trussness array and $\sup$ the maintained witness counts.
+For edges $e$ whose triangle witness set is unchanged by a batch, $\sup(e)$ is unchanged as well; the witness-maintenance phase (\Cref{sec:method-region}) updates $\sup$ exactly for batch edges and the mates of batch edges.
+We write $e_1\sim e_2$ when $e_1$ and $e_2$ share a triangle (are truss mates), and the \emph{mate closure} of a seed set $S$ is the smallest set $C\supseteq S$ such that every mate of an edge in $C$ on a triangle containing a batch edge is also in $C$; our algorithmic closure (\Cref{sec:method-region}) is a superset of this closure and hence a superset of the changeable edges.

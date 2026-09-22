@@ -1,0 +1,92 @@
+This is BibTeX, Version 0.99d (TeX Live 2022/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+The style file: ACM-Reference-Format.bst
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+Database file #1: refs.bib
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated glb_str_ptr (elt_size=4) to 20 items from 10.
+Reallocated global_strs (elt_size=200001) to 20 items from 10.
+Reallocated glb_str_end (elt_size=4) to 20 items from 10.
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Warning--no journal in behrouz2022firmtruss
+Warning--no number and no volume in behrouz2022firmtruss
+Warning--page numbers missing in both pages and numpages fields in behrouz2022firmtruss
+Warning--empty address in chand2024agentbased
+Warning--page numbers missing in both pages and numpages fields in chand2024agentbased
+Warning--empty address in couto2025hardness
+Warning--no journal in gabert2022batch
+Warning--no number and no volume in gabert2022batch
+Warning--page numbers missing in both pages and numpages fields in gabert2022batch
+Warning--empty address in guo2022parallel
+Warning--empty address in hu2026querying
+Warning--page numbers missing in both pages and numpages fields in hu2026querying
+Warning--no journal in huang2016attribute
+Warning--no number and no volume in huang2016attribute
+Warning--page numbers missing in both pages and numpages fields in huang2016attribute
+Warning--empty address in liu2022parallel
+Warning--no journal in liu2024parallel
+Warning--no number and no volume in liu2024parallel
+Warning--page numbers missing in both pages and numpages fields in liu2024parallel
+Warning--can't use both volume and number fields in liu2025parallel
+Warning--empty address in liu2025parallel
+Warning--no journal in luo2023survey
+Warning--no number and no volume in luo2023survey
+Warning--page numbers missing in both pages and numpages fields in luo2023survey
+Warning--can't use both volume and number fields in luo2023efficient
+Warning--empty address in luo2023efficient
+Warning--page numbers missing in both pages and numpages fields in saryce2025powerful
+Warning--no journal in shi2023parallel
+Warning--no number and no volume in shi2023parallel
+Warning--page numbers missing in both pages and numpages fields in shi2023parallel
+Warning--empty address in smith2017truss
+Warning--can't use both volume and number fields in sun2023efficient
+Warning--empty address in sun2023efficient
+Warning--empty address in wu2018ktruss
+Warning--no journal in zhou2014efficient
+Warning--no number and no volume in zhou2014efficient
+Warning--page numbers missing in both pages and numpages fields in zhou2014efficient
+You've used 34 entries,
+            5901 wiz_defined-function locations,
+            1543 strings with 21645 characters,
+and the built_in function-call counts, 39211 in all, are:
+= -- 4594
+> -- 1638
+< -- 0
++ -- 547
+- -- 540
+* -- 3092
+:= -- 4136
+add.period$ -- 175
+call.type$ -- 34
+change.case$ -- 268
+chr.to.int$ -- 33
+cite$ -- 71
+duplicate$ -- 3344
+empty$ -- 2375
+format.name$ -- 667
+if$ -- 9081
+int.to.chr$ -- 3
+int.to.str$ -- 1
+missing$ -- 118
+newline$ -- 427
+num.names$ -- 271
+pop$ -- 1228
+preamble$ -- 1
+purify$ -- 559
+quote$ -- 0
+skip$ -- 1144
+stack$ -- 0
+substring$ -- 2786
+swap$ -- 302
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 776
+warning$ -- 37
+while$ -- 223
+width$ -- 0
+write$ -- 740
+(There were 37 warnings)

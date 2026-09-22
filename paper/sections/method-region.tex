@@ -1,0 +1,65 @@
+\label{sec:method-region}
+
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+  stage/.style={draw, thick, rounded corners, minimum height=1.1cm, minimum width=2.6cm, fill=none},
+  arrow/.style={-{Stealth[length=2.2mm]}, thick}
+]
+\node[stage, label={above:batch $b$ ($B$ ops)}] (batch) {};
+\node[stage, right=0.55cm of batch, label={above:witness counts}] (wit) {};
+\node[stage, right=0.55cm of wit, label={above:seed set $S$}] (seed) {};
+\node[stage, right=0.55cm of seed, label={above:mate closure $R$}] (clo) {};
+\node[stage, right=0.55cm of clo, label={above:region peel}] (peel) {};
+\node[stage, below=0.75cm of peel, label={below:exact $\tau$}] (out) {};
+\draw[arrow] (batch) -- node[above]{\small enumer\-ate triangles} (wit);
+\draw[arrow] (wit) -- node[above]{\small sup-changed mates} (seed);
+\draw[arrow] (seed) -- node[above]{\small parallel BFS} (clo);
+\draw[arrow] (clo) -- node[above]{\small recount $+$ virtual pops} (peel);
+\draw[arrow] (peel) -- (out);
+\end{tikzpicture}
+\caption{Processing one batch. All phases before the peel are parallel; the peel is one bounded sweep over the region.}
+\label{fig:framework}
+\end{figure}
+
+\Cref{fig:framework} shows the three stages our algorithm applies to each batch: witness maintenance, mate closure, and a single region peeling with virtual boundary pops.
+This section develops the first two stages and states the coverage guarantee; \Cref{sec:method-peel} develops the peeling stage and its correctness.
+
+\paragraph{Witness maintenance}
+Let $D$ be the deletions of the batch and $I$ its insertions, $b=D\uplus I$.
+The witness phase updates the maintained supports $\sup(e)$ so that, after the phase, $\sup(e)$ equals the number of triangles containing $e$ in the \emph{current} graph, for every edge $e$ whose triangle set was touched by~$b$.
+For every edge $f\in D\cup I$ we enumerate the common neighbors of its endpoints in parallel (each batch edge is an independent task), obtaining the set $\Delta(f)$ of triangles that are created or destroyed by the update.
+For $f\in I$ we increment $\sup(g)$ by one for each $g$ in each enumerated triangle $\{f,g,h\}$; for $f\in D$ we decrement.
+The per-mate contributions are aggregated with fetch-and-add on a per-batch counter array $\mathrm{dcount}$, so two batch updates that touch the same mate aggregate into a single delta rather than two traversals.
+Deletions are processed before insertions, which makes the batch semantics unambiguous when a batch both deletes and re-inserts an edge: the deletion path removes the edge's id from the adjacency of its endpoints and the insertion path allocates a fresh id.
+Because the triangle enumeration of phase 1 is the only place where the batch touches the global graph structure, its cost is $O\!\big(\sum_{f\in b}(\deg(f_1)+\deg(f_2))\big)$ work spread over $T$ threads.
+
+\paragraph{Precise seeding}
+After the witness phase, the algorithm knows every edge whose support changed: the batch edges themselves, and every mate whose $\mathrm{dcount}$ is nonzero.
+These are the \emph{seeds} $S$.
+A deleted edge may be seeded as a mate of another batch edge, or be a seed through its own deletion; only edges still present in the graph are seeded, and deleted edges are collected into the seed scan before their removal from the adjacency, so a mate that is itself deleted is dropped by the alive-guard at seeding time.
+An obvious alternative---seeding every edge enumerated by phase 1, including mates whose support did not change---enlarges the seed set without enlarging the guaranteed change set.
+Our implementation supports both modes (\texttt{--ablate allseeds}) and the experiments (\Cref{sec:experiments}) show that precise seeding shrinks regions measurably on community-structured graphs.
+
+\paragraph{Region closure}
+The region is a superset of the truss-connected closure of $S$.
+Starting from $S$, the closure performs a parallel breadth-first expansion over triangles: an unmarked edge $f$ is enqueued when it is a truss mate of a region edge $g$ on some triangle $\{g,f,h\}$, in which case $f$ and $h$ both join the region.
+The expansion terminates because each edge enters the region at most once.
+We prove below that this closure contains every edge whose trussness can change, so restricting all subsequent work to it is sound.
+
+\begin{lemma}[Coverage]
+\label{lem:coverage}
+Let $G'$ be the graph obtained from $G$ by applying batch $b$, and let $C$ be the truss-connected mate closure of the seed set $S$ in $G'$.
+If $\tau_{G'}(e)\ne \tau_G(e)$ for some edge $e$, then $e\in C$.
+\end{lemma}
+
+\begin{proof}
+Run the peeling of \Cref{def:peeling} on $G$ and on $G'$, and let $e$ be an edge whose values differ.
+Consider the first time the two peelings assign $e$ different values; without loss of generality the pops differ, so some mate $g$ of $e$ is popped at a different sweep position in the two runs.
+Following the pop positions backwards, there is a first edge whose pop position differs because its own support sequence differs; supports differ only when a triangle witness is created or destroyed (a batch edge, hence in $S$) or when a mate with an earlier position difference decrements it.
+Tracing this dependency backwards through mate adjacency yields a chain of edges from $e$ to a seed, in which consecutive edges share a triangle---that is, a mate-adjacency path from $e$ into $S$, so $e\in C$.
+\end{proof}
+
+Two structural remarks are in order.
+First, the closure may be much smaller than the whole graph but much larger than the batch: in graphs with a single large truss-connected dense component every seed's closure reaches the whole component, and our algorithm then degenerates gracefully to peeling that component once per batch---still one traversal where per-edge algorithms perform $B$.
+Second, the closure is computed in $G'$ (the post-batch graph), which keeps the expansion's adjacency scans simple: every edge visible during the expansion exists in the current graph.

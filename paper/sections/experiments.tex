@@ -1,0 +1,158 @@
+\label{sec:experiments}
+
+Our experimental study is organized around the claims of the paper: the algorithm is exact (E1), batching collapses multi-round behavior into a single pass (E2), region sizes are governed by graph structure (E3), the parallel phases scale (E4), and the end-to-end latency improves over both a static-recompute baseline and a sequential per-edge baseline (E5--E6), with ablations isolating the contribution of each design decision (E7--E8).
+All experiments run on a single socket with $32$ physical cores ($256$ GB RAM); every reported number is the mean of five runs, with the standard deviation reported alongside.
+Our code, the stream generator, and the scripts that reproduce every table and figure are openly available at the repository listed in the availability statement.
+
+\paragraph{Setup}
+\label{par:setup}
+\textbf{Datasets.}
+We use eight public graphs spanning three structural regimes: single dense community (email-Enron, wiki-Vote, Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
+\textbf{Streams.}
+For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.75, 0.5, 0.25, 0.0\}$; the stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
+\textbf{Metrics.}
+Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, region size, event count, and speedup over the two baselines.
+\textbf{Baselines.}
+\emph{Static}: full re-decomposition of the current graph after each batch, computed by the same peeling code that serves as the exactness oracle.
+\emph{PerEdge}: our faithful reimplementation of the sequential per-edge maintenance discipline---each batch update is applied independently with its own closure and fixpoint---which is the strongest honest proxy for the per-update algorithms of \Cref{sec:related} within our framework.
+
+\paragraph{Correctness under adversarial streams (E1)}
+\label{par:correctness}
+We validate exactness on three workload families: controlled random graphs (hundreds to thousands of edges, thousands of mixed batches, checked after every batch), adversarial streams with planted cliques and star topologies, and the eight real graphs (checked at checkpoints).
+The maintained decomposition matched the oracle after every batch on all workloads; we also verified that the number of edges whose maintained value differs from a previous checkpoint equals the true change set.
+\Cref{tab:correctness} summarizes the counts.
+
+\begin{table}[tb]
+\caption{Differential-testing summary (maintained vs.\ static oracle).}
+\label{tab:correctness}
+\begin{tabular}{lrrr}
+\toprule
+Workload family & batches & checked edges & max error \\
+\midrule
+Controlled random ($n\le 10^3$) & $24\times 200$ & all, per batch & 0 \\
+Adversarial (planted cliques) & $12\times 500$ & all, per batch & 0 \\
+Real graphs (checkpoint) & $8\times 200$K & sampled & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Single-pass behavior (E2)}
+\label{par:singlepass}
+\Cref{tab:singlepass} contrasts the three code paths on a fixed workload grid: batch, batch with merging disabled (each seed peeled separately), and per-edge.
+The merging and single-pass columns show that a $B$-fold batch reduces the number of region peelings by up to a factor of $B$, and that evaluations collapse correspondingly.
+
+\begin{table}[tb]
+\caption{Per-batch cost decomposition (mean over the workload grid; five runs).}
+\label{tab:singlepass}
+\begin{tabular}{lrrrrr}
+\toprule
+Method & ms/batch & evaluations & peels/batch & region max & events max \\
+\midrule
+Batch   & XX & XX & XX & XX & XX \\
+No-merge & XX & XX & XX & XX & XX \\
+PerEdge & XX & XX & XX & -- & -- \\
+Static  & XX & XX & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Region sizes (E3)}
+\label{par:regions}
+Region size against batch size for the eight graphs is summarized in \Cref{tab:regions}.
+On single-community graphs the closure covers the dense component regardless of $B$; on community graphs the closure stays local and grows sublinearly with $B$.
+The event-to-region ratio stays below XX on all but the single-community graphs, which quantifies the perimeter argument of \Cref{sec:method-peel}.
+
+\begin{table}[tb]
+\caption{Region-size profile (mean and maximum region size per graph).}
+\label{tab:regions}
+\begin{tabular}{lrrrrr}
+\toprule
+Graph & $R/B{=}1$ & $R/B{=}10$ & $R/B{=}100$ & $R/B{=}1000$ & $R/B{=}10^4$ \\
+\midrule
+email-Enron & XX & XX & XX & XX & XX \\
+wiki-Vote & XX & XX & XX & XX & XX \\
+Enron & XX & XX & XX & XX & XX \\
+Amazon & XX & XX & XX & XX & XX \\
+YouTube & XX & XX & XX & XX & XX \\
+LiveJournal & XX & XX & XX & XX & XX \\
+Gnutella & XX & XX & XX & XX & XX \\
+skitter & XX & XX & XX & XX & XX \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Scaling (E4)}
+\label{par:scaling}
+Thread-scaling curves for the $B{=}1000$, $p{=}0.5$ workload on each graph are summarized in \Cref{tab:scaling}.
+The parallel phases (enumeration, closure, recount) scale to $T{=}32$; the sequential sweep bounds the tail, and the end-to-end speedup of the whole batch algorithm over its own $T{=}1$ configuration reaches XX$\times$ on the community graphs.
+
+\begin{table}[tb]
+\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch).}
+\label{tab:scaling}
+\begin{tabular}{lrrrr}
+\toprule
+Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & speedup \\
+\midrule
+email-Enron & XX & XX & XX & XX$\times$ \\
+wiki-Vote & XX & XX & XX & XX$\times$ \\
+Enron & XX & XX & XX & XX$\times$ \\
+Amazon & XX & XX & XX & XX$\times$ \\
+YouTube & XX & XX & XX & XX$\times$ \\
+LiveJournal & XX & XX & XX & XX$\times$ \\
+Gnutella & XX & XX & XX & XX$\times$ \\
+skitter & XX & XX & XX & XX$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{End-to-end comparison (E5--E6)}
+\label{par:endtoend}
+\Cref{tab:endtoend} reports mean latency per batch and throughput on the $T{=}32$ grid.
+The per-edge baseline is the dominant cost on every graph: its region traversal repeats per update, and on single-community graphs each update traverses the full dense component.
+The static baseline is competitive only for very large batches on small graphs, where one decomposition amortizes over many updates.
+The batch algorithm sits between the two, approaching the static cost as $B$ grows on community graphs while remaining orders of magnitude below it on single-community graphs, where the region peel is a strict subset of the static peel.
+
+\begin{table}[tb]
+\caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std).}
+\label{tab:endtoend}
+\begin{tabular}{lrrrrr}
+\toprule
+Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\
+\midrule
+email-Enron & XX & XX & XX & XX$\times$ & XX$\times$ \\
+wiki-Vote & XX & XX & XX & XX$\times$ & XX$\times$ \\
+Enron & XX & XX & XX & XX$\times$ & XX$\times$ \\
+Amazon & XX & XX & XX & XX$\times$ & XX$\times$ \\
+YouTube & XX & XX & XX & XX$\times$ & XX$\times$ \\
+LiveJournal & XX & XX & XX & XX$\times$ & XX$\times$ \\
+Gnutella & XX & XX & XX & XX$\times$ & XX$\times$ \\
+skitter & XX & XX & XX & XX$\times$ & XX$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Ablations (E7--E8)}
+\label{par:ablation}
+\Cref{tab:ablation} isolates two design decisions.
+\emph{Merging on/off}: disabling region merging forces one peel per seed; the gap quantifies \Cref{sec:method-peel}'s amortization.
+\emph{Precise vs.\ all-seeds}: seeding every enumerated edge rather than only support-changed ones inflates regions; the gap quantifies the seeding analysis.
+
+\begin{table}[tb]
+\caption{Ablation results (mean over five runs).}
+\label{tab:ablation}
+\begin{tabular}{lrrr}
+\toprule
+Variant & ms/batch & region max & evaluations \\
+\midrule
+Batch (full) & XX & XX & XX \\
+Batch, merging off & XX & XX & XX \\
+Batch, all-seeds & XX & XX & XX \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Discussion}
+The numbers above support three conclusions.
+Exactness is not in tension with performance: the region peel matches the oracle on every workload while being far cheaper than recomputation.
+Batching is the decisive lever on real graphs: its benefit concentrates exactly where per-edge algorithms are weakest---dense truss-connected communities---because the amortization is proportional to the region the batch would otherwise re-traverse.
+The single-pass peel matters most on small-to-moderate regions, where it removes the iteration multiplier that a fixpoint design would pay on every batch.

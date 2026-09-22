@@ -1,0 +1,74 @@
+% Batch-aware parallel exact k-truss maintenance on dynamic graphs.
+% PVLDB Vol. 20 submission. Built on the official VLDB-Template (acmart v2.19).
+\documentclass[sigconf, nonacm]{acmart}
+
+%%% do not modify the following VLDB block %%
+%%% VLDB block start %%%
+\usepackage{pvldb}
+%%% VLDB block end %%%
+
+\renewcommand\vldbdoi{XX.XX/XXX.XX}
+\renewcommand\vldbpages{XXX-XXX}
+\renewcommand\vldbavailabilityurl{https://github.com/llmnjust-afk/VLDB2027_Work1}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,decorations.pathreplacing}
+\usepackage{cleveref}
+\usepackage{balance}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{observation}{Observation}
+
+\begin{document}
+\title{Batch-Aware Parallel Maintenance of Exact k-Truss Decomposition on Dynamic Graphs}
+
+\author{Anonymous}
+\affiliation{\institution{Anonymous Institution}\country{}}
+\email{anonymous@example.org}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+%%% PVLDB reference-format block is emitted by pvldb.sty %%%
+
+\maketitle
+
+\section{Introduction}
+\input{sections/introduction}
+
+\section{Preliminaries}
+\input{sections/background}
+
+\section{Related Work}
+\input{sections/related-work}
+
+\section{The Batch Algorithm}
+\input{sections/method-region}
+
+\input{sections/method-peel}
+
+\section{Parallelization and Implementation}
+\input{sections/parallel}
+
+\section{Experiments}
+\input{sections/experiments}
+
+\section{Conclusion}
+\input{sections/conclusion}
+
+\begin{acks}
+This work was supported by computational resources provided by the authors' institution.
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\end{document}

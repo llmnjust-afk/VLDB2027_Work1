@@ -1,0 +1,55 @@
+\label{sec:method-peel}
+
+The peeling stage recomputes the trussness of exactly the region $R$ produced by the closure, treating every edge outside $R$ as frozen.
+The stage has four phases: recount, event collection, the sweep, and restoration.
+
+\paragraph{Recount}
+For every $e\in R$ the algorithm recomputes $\sup(e)$ from scratch in the current graph and stores it in a fresh array $\mathrm{psup}$.
+The recount is embarrassingly parallel and costs $O\!\big(\sum_{e\in R}(\deg(e_1)+\deg(e_2))\big)$.
+Recounting, rather than trusting incremental bookkeeping, is what makes the design robust: even if a mate's witness count drifted, the region peel starts from exact supports.
+The maintained $\sup$ array is then restored from $\mathrm{psup}$ for region edges, keeping the invariant that $\sup(e)$ equals the triangle count of $e$ for all present edges.
+
+\paragraph{Virtual boundary events}
+Fix an external edge $X\notin R$ that shares a triangle with a region edge.
+In a hypothetical full-graph peeling, $X$ is popped exactly once, at sweep position $s_X=\tau(X)-2$, and that pop decrements the supports of its alive mates.
+Since $\tau(X)$ is unchanged by the batch (\Cref{lem:coverage}), $X$'s removal event is completely determined by the maintained value: the algorithm records a \emph{virtual pop} $(X, s_X)$.
+Each event is recorded once per external edge---the collection phase enumerates, for every $e\in R$, the external mates of $e$'s triangles, marks them in a scratch marker array, and materializes the distinct marks into events sorted by bucket with consecutive duplicates removed.
+At sweep position $s$, all events with $s_X=s$ \emph{fire}: $X$ is marked dead in a shared alive array, and every region mate of $X$ on a shared triangle receives the same alive-guarded decrement that a real pop would issue.
+The alive array thus carries two roles: real pops mark region edges, and fired events mark external edges, which lets the sweep's triangle guard treat both uniformly.
+
+\paragraph{The sweep}
+The sweep processes buckets $s=0,1,\dots,s_{\max}$ exactly as Wang and Cheng~\cite{wang2012truss}: every alive region edge with $\mathrm{psup}=s$ is popped, assigned $\tau(e)=s+2$, and the triangles of $e$ are scanned through the stamped adjacency (one shared stamp per sweep position, so the scan allocates nothing).
+For each triangle $\{e,g,h\}$ the guard evaluates, per mate $m\in\{g,h\}$, whether $m$ is already removed in the relevant sense:
+\[
+\mathrm{dead}(m)=
+\begin{cases}
+\neg\mathrm{alive}(m) & m\in R \text{ or } m \text{ is an event mark},\\
+\tau(m) < s+2 & \text{otherwise (frozen mate).}
+\end{cases}
+\]
+If $\mathrm{dead}(g)\vee\mathrm{dead}(h)$ the triangle is skipped---this is exactly the alive-guard of the static peel, and omitting it double-decrements mates whose first side already popped.
+Otherwise each alive region mate $m$ with $\mathrm{psup}(m)>s$ is decremented and re-bucketed.
+Frozen mates that are neither region edges nor event marks are never touched: their decrements are irrelevant because their trussness is fixed, and the guard's $\tau(m)<s+2$ test reproduces the fact that in the full peeling such a mate pops at $s_m=\tau(m)-2<s$ and hence is already removed.
+The sweep terminates when the bucket empties; an internal assertion checks that the number of pops equals $|R|$, so every region edge is assigned.
+
+\begin{theorem}[Exactness]
+\label{thm:exact}
+After the sweep, $\tau(e)$ equals the trussness of $e$ in $G'$ for every $e\in R$, and $\tau$ is unchanged for $e\notin R$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Couple the region sweep with a full peeling of $G'$.
+Invariant: at every sweep position $s$, the set of removed edges and the residual supports of region edges coincide with the full peeling's state restricted to $R$.
+Initialization holds because $\mathrm{psup}$ is exact on $R$ and external edges enter with their maintained values.
+The inductive step has three cases.
+If the full peeling pops $e\in R$ at position $s$, then $e$ is alive with residual support $s$ in the coupled state, so the region sweep pops it too, and both runs decrement exactly the same set of triangles: for a triangle fully inside $R$ both sweeps apply the same guard; for a triangle $\{e,X,\cdot\}$ with $X\notin R$, the full peeling's decrement is subsumed either by $X$'s virtual event (fired at $s_X$) or by the frozen-mate guard, and the exactly-once collection of events ensures no double-counting.
+If the full peeling pops $X\notin R$ at position $s$, then $s=s_X$ by unchangedness, the event fires, and the region sweep applies the identical decrement to alive region mates.
+If the full peeling pops a frozen edge $Y$ with $Y$ adjacent to no region edge, neither run touches $R$.
+The support sequences therefore agree, and by induction the assigned values agree; the unchanged edges are correct by \Cref{lem:coverage}.
+\end{proof}
+
+\paragraph{Why one pass beats fixpoint}
+A natural batch design applies each update with the per-edge machinery of prior work, or, in batch form, propagates support decrements iteratively until a fixpoint.
+Both pay for the region once per iteration, and the number of iterations grows with the depth of the peeling cascade---on dense communities the cascade spans the entire support range, so the fixpoint cost multiplies the per-update cost rather than amortizing it.
+The single-pass design replaces iteration with a bounded sweep whose work is $O\!\big(\sum_{e\in R}\mathrm{psup}(e)\big)$ independent of the batch size; batching enters only through the shared region, so ten thousand co-located updates cost one traversal, not ten thousand.
+The events add a term $O(\Delta)$, where $\Delta$ counts region-boundary triangles---bounded by the region's perimeter, which the experiments show stays a small fraction of the region for community graphs.

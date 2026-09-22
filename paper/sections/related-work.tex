@@ -1,0 +1,26 @@
+\label{sec:related}
+
+\paragraph{Truss maintenance on dynamic graphs}
+The first wave of dynamic truss algorithms processed single edge updates with closure-plus-fixpoint iterations~\cite{zhou2014efficient}, establishing that exact maintenance is feasible but sequential.
+The current state of the art refines the per-update discipline: Sun et al.~\cite{sun2023efficient} reorganize the closure around star-shaped witness structures and bound the update cost in terms of the affected truss; their follow-up extends the machinery to uncertain graphs with a probabilistic decomposition, indexing and dynamic maintenance on TODS~\cite{sun2025probabilistic}.
+Mo et al.~\cite{mo2023distributed} move the same single-update protocol into a distributed setting, and Hu et al.~\cite{hu2026querying} introduce span-constrained temporal trusses with dynamic index maintenance, again updating one edge at a time.
+All of these systems inherit a common structural property: each update performs its own traversal of the affected truss-connected region, so a batch of $B$ co-located updates costs $B$ region traversals.
+Our work removes this property: the region is computed once per batch and re-peeled once, and we prove that the single pass reproduces exact values for arbitrary mixed batches.
+On the hardness side, Couto and Fernandes~\cite{couto2025hardness} recently showed that even restricted variants of dynamic core and truss maintenance carry intrinsic conditional hardness, sharpening the case that practical systems must exploit batch structure rather than hope for a universally cheap update rule.
+
+\paragraph{Batch-dynamic core maintenance}
+The core model, where updates admit far simpler propagation, has already converged on the batch paradigm.
+Liu et al.~\cite{liu2022parallel} introduced parallel batch-dynamic $k$-core decomposition with near-optimal work per batch and demonstrated order-of-magnitude wins over per-update processing; the journal version of that line~\cite{liu2024parallel} adds asynchronous reads, and the PACMMOD'25 treatment~\cite{liu2025parallel} consolidates the theory and practice of parallel core decomposition.
+Batch dynamic $k$-core hierarchies were studied by Gabert et al.~\cite{gabert2022batch}, order-based sequential core maintenance by Guo and Sekerinski~\cite{guo2022parallel}, bipartite core maintenance by Luo et al.~\cite{luo2023efficient}, differentially private variants by Dhulipala et al.~\cite{dhulipala2023nearoptimal}, and hypergraph cores by Arafat et al.~\cite{arafat2023neighborhoodbased}.
+The truss resists a direct transfer of these designs: core updates propagate a single min-label through a bounded number of rounds, whereas truss peeling imposes a global removal order whose coupling across support levels has no bounded-round analogue.
+Our formulation keeps the batch-friendly pieces of the core machinery---parallel closure, batched witness maintenance---but replaces fixpoint iteration with a single bounded peeling whose correctness we establish through the virtual-pop argument.
+
+\paragraph{Parallel static truss decomposition}
+On static snapshots the peeling algorithm of Wang and Cheng~\cite{wang2012truss} remains the backbone of every high-performance implementation: shared-memory decompositions by Smith et al.~\cite{smith2017truss} and Kabir and Madduri~\cite{kabir2017sharedmemory} parallelize bucket peeling with atomics or staging, Wu et al.~\cite{wu2018ktruss} engineer it for consumer hardware, Che et al.~\cite{che2020accelerating} add CPU--GPU co-processing in PVLDB, and Conte et al.~\cite{conte2020truly} combine exact and approximate passes for max-truss community detection.
+Recent work extends the decomposition itself: Chen et al.~\cite{chen2021higherorder} generalize trusses to higher-order clique structures with a TKDE journal treatment, Chen et al.~\cite{chen2024parallel} parallelize higher-order truss decomposition, Chand et al.~\cite{chand2024agentbased} unlock truss computation through mobile-agent triangle counting, and Shi et al.~\cite{shi2023parallel} situate trusses inside parallel nucleus decompositions.
+Bounds for peeling and truss maintenance are charted by Burkhardt et al.~\cite{burkhardt2018bounds}.
+Streaming and batch \emph{construction} of trusses was explored by Jakkula and Karypis~\cite{jakkula2019streaming}, whose batched ingestion pipeline amortizes triangle counting but does not provide exact parallel maintenance with per-batch guarantees; our algorithm targets exactly that gap, reusing the bucket-peeling skeleton of Wang and Cheng~\cite{wang2012truss} inside a region restricted to the batch's mate closure with boundary simulation.
+
+\paragraph{Dense-subgraph analytics}
+Beyond the truss, the densest-subgraph literature has matured into survey-grade territory, with Lanciano et al.~\cite{lanciano2024survey} and Luo et al.~\cite{luo2023survey} systematizing algorithms and variants.
+These formulations optimize a single density objective per snapshot, whereas truss decompositions expose a full cohesion hierarchy per edge; the hierarchy is what maintenance must preserve exactly, and it is also what makes the batch problem harder than recomputing a single densest subgraph.
