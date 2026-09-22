@@ -88,7 +88,7 @@ The design goal is not speedup but the absence of pathological degradation: with
 The contrast with a naive parallelization is stark.
 Our first implementation spawned $T{-}1$ operating-system threads per phase; on the 185K-edge Gnutella workload its per-batch latency rose almost linearly with the thread count, from 0.53\,ms at $T{=}1$ to 2.7\,ms at $T{=}2$, 6.7\,ms at $T{=}8$, and 30.4\,ms at $T{=}32$---a 57$\times$ slowdown at 32 threads on work whose sequential cost is half a millisecond.
 With the persistent pool and adaptive dispatch, the same workload holds at 0.5--0.6\,ms per batch from $T{=}1$ through $T{=}256$.
-On the densest graphs, where insertion batches produce regions above 90K edges, the pool-dispatched recount phases engage at large $T$; their contribution is bounded by the sequential sweep that dominates end-to-end latency, so the whole-batch speedup over $T{=}1$ reaches XX$\times$ on \graphX and stays within 1.05$\times$ elsewhere.
+On the densest graphs, where insertion batches produce regions above 90K edges, the pool-dispatched recount phases engage at large $T$; their contribution is bounded by the sequential sweep that dominates end-to-end latency, so whole-batch latency stays within XX\% of its $T{=}1$ value on every graph and thread count we measure.
 
 \begin{table}[tb]
 \caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs).}
