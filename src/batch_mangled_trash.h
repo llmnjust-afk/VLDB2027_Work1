@@ -128,15 +128,12 @@ public:
   }
 
   void region_closure(std::vector<uint32_t>& seeds, BatchStats& st) {
-    reg_list.clear();
     for (uint32_t e : seeds) {
       if (!g.alive(e) || in_reg[e]) continue;
       in_reg[e] = 1;
       reg_list.push_back(e);
     }
     if (reg_list.size() > st.region_max) st.region_max = reg_list.size();
-    seeds.clear();
-    for (uint32_t e : reg_list) seeds.push_back(e);
     while (!seeds.empty()) {
       st.evals += seeds.size();
       for (uint32_t t = 0; t < T; ++t) nxt_t[t].clear();
@@ -167,15 +164,6 @@ public:
   }
 
   void region_peel(BatchStats& st) {
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-in] n=%zu\n", reg_list.size());
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-call]\n");
-    if (BT_WATCH >= 0) {
-      std::vector<uint32_t> tmp(reg_list);
-      std::sort(tmp.begin(), tmp.end());
-      uint32_t dup = 0;
-      for (size_t i = 1; i < tmp.size(); ++i) if (tmp[i] == tmp[i-1]) dup++;
-      fprintf(stderr, "[peel-in] region=%zu dup=%zu\n", reg_list.size(), (size_t)dup);
-    }
     for (uint32_t t = 0; t < T; ++t) evt_t[t].clear();
     run_jobs(reg_list.size(), [&](uint32_t tid, uint64_t i) {
       uint32_t eid = reg_list[i];
@@ -198,8 +186,6 @@ public:
     run_jobs(reg_list.size(), [&](uint32_t, uint64_t i) {
       uint32_t e = reg_list[i];
       sup[e].store(psup[e]);
-      if (e == 3724 && BT_WATCH >= 0)
-        fprintf(stderr, "[init3724] psup=%u tau=%u\n", psup[e], tau[e]);
     });
     std::vector<std::pair<uint32_t, uint32_t>> evs;
     for (uint32_t t = 0; t < T; ++t)
@@ -212,7 +198,6 @@ public:
       evs[evw++] = evs[i];
     }
     evs.resize(evw);
-    for (auto& ev : evs) ub_in[ev.second] = 1;
     for (uint32_t e : reg_list) palive[e] = 1;
     for (auto& ev : evs) palive[ev.second] = 1;
     uint32_t maxsup = 0;
@@ -226,7 +211,6 @@ public:
     for (uint32_t s = 0; s <= maxsup; ++s) {
       while (evptr < evs.size() && evs[evptr].first == s) {
         uint32_t X = evs[evptr++].second;
-        if (BT_WATCH >= 0) fprintf(stderr, "[vev] s=%u eid=%u\n", s, X);
         palive[X] = 0;
         st.evals++;
         uint32_t a = g.eu[X], b = g.ev[X];
@@ -235,16 +219,11 @@ public:
         for (auto& r : g.adj[b]) {
           if (!st0.test(r.nbr)) continue;
           uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
           uint32_t mm[2] = {e1, e2};
           for (uint32_t mi = 0; mi < 2; ++mi) {
             uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
+            if (!in_reg[m] || !palive[m] || psup[m] <= s) continue;
             psup[m]--;
-            if (m == 3724 && BT_WATCH >= 0)
-              fprintf(stderr, "[vdec3724] s=%u src=%u psup->%u\n", s, X, psup[m]);
             buckets[psup[m]].push_back(m);
           }
         }
@@ -257,23 +236,17 @@ public:
         palive[eid] = 0;
         popped++;
         st.evals++;
-        if (BT_WATCH >= 0) fprintf(stderr, "[rpop] s=%u eid=%u psup=%u\n", s, eid, psup[eid]);
         uint32_t a = g.eu[eid], b = g.ev[eid];
         st0.next_epoch();
         for (auto& r : g.adj[a]) st0.mark(r.nbr, r.eid);
         for (auto& r : g.adj[b]) {
           if (!st0.test(r.nbr)) continue;
           uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
           uint32_t mm[2] = {e1, e2};
           for (uint32_t mi = 0; mi < 2; ++mi) {
             uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
+            if (!in_reg[m] || !palive[m] || psup[m] <= s) continue;
             psup[m]--;
-            if (m == 3724 && BT_WATCH >= 0)
-              fprintf(stderr, "[pdec3724] s=%u src=%u psup->%u\n", s, eid, psup[m]);
             buckets[psup[m]].push_back(m);
           }
         }
@@ -283,11 +256,9 @@ public:
       fprintf(stderr, "region peel incomplete: popped=%u region=%zu\n", popped, reg_list.size());
       exit(1);
     }
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-out] popped=%u\n", popped);
     for (uint32_t e : reg_list) palive[e] = 0;
     for (auto& ev : evs) {
       palive[ev.second] = 0;
-      ub_in[ev.second] = 0;
       dead_mark[ev.second] = 0;
     }
   }
@@ -317,26 +288,18 @@ public:
     stats.deltas += dels.size() + ins.size();
     stats.del_deltas += dels.size();
     stats.ins_deltas += ins.size();
-    if (!dels.empty()) { if (BT_WATCH >= 0) fprintf(stderr, "[pd-in] %zu\n", dels.size()); phase_deletions(dels); if (BT_WATCH >= 0) fprintf(stderr, "[pd-out]\n"); }
-    if (!ins.empty()) { if (BT_WATCH >= 0) fprintf(stderr, "[pi-in] %zu\n", ins.size()); phase_insertions(ins); if (BT_WATCH >= 0) fprintf(stderr, "[pi-out]\n"); }
+    if (!dels.empty()) phase_deletions(dels);
+    if (!ins.empty()) phase_insertions(ins);
     return true;
   }
 
-  bool apply_batch_nomerge(const std::vector<Op>& raw) {
-    bool ok = true;
+  bool apply_batch(const std::vector<Op>& raw) {
+    std::unordered_set<uint64_t> delset, insset;
     for (auto& op : raw) {
-      std::vector<Op> one = {op};
-      ok = apply_batch(one) && ok;
-    }
-    return ok;
-  }
-
-  void phase_deletions(std::vector<uint32_t>& dels) {
-    for (uint32_t t = 0; t < T; ++t) seeds_t[t].clear();
-    for (uint32_t e : dels) dead_mark[e] = 1;
-    run_jobs(dels.size(), [&](uint32_t tid, uint64_t i) {
-      uint32_t e = dels[i];
-      if (!g.alive(e)) return;
+      if (op.u == op.v) continue;
+      uint64_t k = DynGraph::ekey(op.u, op.v);
+      if (op.del) {
+        if (g.has(op.u, op.v)) delset.insert(k);
       uint32_t u = g.eu[e], v = g.ev[e];
       g.common_neighbors(u, v, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
         if ((dead_mark[e1] && e1 < e) || (dead_mark[e2] && e2 < e)) return;
@@ -354,7 +317,6 @@ public:
         for (auto& r : g.adj[v]) seeds_t[tid].push_back(r.eid);
       }
     });
-    if (BT_WATCH >= 0) fprintf(stderr, "[pd-enum-done]\n");
     for (uint32_t e : dels) {
       if (!g.alive(e)) continue;
       g.remove_edge(e);
@@ -444,7 +406,8 @@ public:
     region_peel(stats);
     for (uint32_t e : reg_list) in_reg[e] = 0;
     reg_list.clear();
-  }  void grow_structures(uint32_t eid) {
+  }
+  void grow_structures(uint32_t eid) {
     size_t nsz = (size_t)std::max<uint64_t>(eid + 1, (g.eu.size() ? g.eu.size() * 2 : 1024));
     g.eu.resize(nsz, UINT32_MAX);
     g.ev.resize(nsz, UINT32_MAX);

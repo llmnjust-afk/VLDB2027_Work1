@@ -32,9 +32,6 @@ public:
   std::vector<uint8_t> in_reg;
   std::vector<uint8_t> ub_in;
   std::vector<uint8_t> dead_mark;
-  std::vector<uint32_t> psup;
-  std::vector<uint8_t> palive;
-  std::vector<std::vector<uint32_t>> evt_t;
   std::vector<uint32_t> ubc;
   std::vector<uint32_t> frontier, next, reg_list;
   std::vector<std::vector<uint32_t>> chg_e, nxt_t, seeds_t, dl;
@@ -72,9 +69,6 @@ public:
     ub_in.assign(cap, 0);
     ubc.assign(cap, 0);
     dead_mark.assign(cap, 0);
-    psup.assign(cap, 0);
-    palive.assign(cap, 0);
-    evt_t.resize(T);
   }
 
   template <class F>
@@ -127,169 +121,59 @@ public:
     return best;
   }
 
-  void region_closure(std::vector<uint32_t>& seeds, BatchStats& st) {
-    reg_list.clear();
-    for (uint32_t e : seeds) {
-      if (!g.alive(e) || in_reg[e]) continue;
-      in_reg[e] = 1;
-      reg_list.push_back(e);
-    }
-    if (reg_list.size() > st.region_max) st.region_max = reg_list.size();
-    seeds.clear();
-    for (uint32_t e : reg_list) seeds.push_back(e);
-    while (!seeds.empty()) {
-      st.evals += seeds.size();
-      for (uint32_t t = 0; t < T; ++t) nxt_t[t].clear();
-      run_jobs(seeds.size(), [&](uint32_t tid, uint64_t i) {
-        uint32_t eid = seeds[i];
-        uint32_t a = g.eu[eid], b = g.ev[eid];
-        g.common_neighbors(a, b, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-          if (!ub_in[e1]) {
-            ub_in[e1] = 1;
-            nxt_t[tid].push_back(e1);
-          }
-          if (!ub_in[e2]) {
-            ub_in[e2] = 1;
-            nxt_t[tid].push_back(e2);
-          }
-        });
-      });
-      seeds.clear();
-      for (uint32_t t = 0; t < T; ++t)
-        for (uint32_t e : nxt_t[t]) {
-          if (in_reg[e]) continue;
-          in_reg[e] = 1;
-          reg_list.push_back(e);
-          seeds.push_back(e);
+  void fixpoint(bool promote, BatchStats& st) {
+    uint32_t round = 0;
+    while (!frontier.empty()) {
+      round++;
+      if (st.region_max < frontier.size()) st.region_max = frontier.size();
+      st.region_sum += frontier.size();
+      st.evals += frontier.size();
+      for (uint32_t t = 0; t < T; ++t) {
+        chg_e[t].clear();
+        chg_v[t].clear();
+        nxt_t[t].clear();
+      }
+      uint64_t fsz = frontier.size();
+      run_jobs(fsz, [&](uint32_t tid, uint64_t i) {
+        uint32_t eid = frontier[i];
+        if (!g.alive(eid)) return;
+        uint16_t nt = eval_trussness(g.eu[eid], g.ev[eid], g, tau, stamps[tid], bufs[tid]);
+        if (promote ? (nt > tau[eid]) : (nt < tau[eid])) {
+          chg_e[tid].push_back(eid);
+          chg_v[tid].push_back(nt);
         }
+      });
+      for (uint32_t e : frontier) in_next[e] = 0;
+      next.clear();
+      for (uint32_t t = 0; t < T; ++t)
+        for (size_t i = 0; i < chg_e[t].size(); ++i) {
+          uint32_t eid = chg_e[t][i];
+          tau[eid] = chg_v[t][i];
+          expand_local(t, eid, in_next, nxt_t[t]);
+        }
+      for (uint32_t t = 0; t < T; ++t)
+        for (uint32_t e : nxt_t[t]) next.push_back(e);
+      std::swap(frontier, next);
+      if (round > 100000) {
+        fprintf(stderr, "fixpoint round overflow\n");
+        exit(1);
+      }
     }
-    for (uint32_t e : reg_list) ub_in[e] = 0;
+    st.rounds += round;
   }
 
-  void region_peel(BatchStats& st) {
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-in] n=%zu\n", reg_list.size());
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-call]\n");
-    if (BT_WATCH >= 0) {
-      std::vector<uint32_t> tmp(reg_list);
-      std::sort(tmp.begin(), tmp.end());
-      uint32_t dup = 0;
-      for (size_t i = 1; i < tmp.size(); ++i) if (tmp[i] == tmp[i-1]) dup++;
-      fprintf(stderr, "[peel-in] region=%zu dup=%zu\n", reg_list.size(), (size_t)dup);
-    }
-    for (uint32_t t = 0; t < T; ++t) evt_t[t].clear();
-    run_jobs(reg_list.size(), [&](uint32_t tid, uint64_t i) {
-      uint32_t eid = reg_list[i];
-      uint32_t a = g.eu[eid], b = g.ev[eid];
-      st.evals++;
-      uint32_t c = 0;
-      g.common_neighbors(a, b, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-        ++c;
-        if (!in_reg[e1] && !dead_mark[e1]) {
-          dead_mark[e1] = 1;
-          evt_t[tid].push_back(e1);
-        }
-        if (!in_reg[e2] && !dead_mark[e2]) {
-          dead_mark[e2] = 1;
-          evt_t[tid].push_back(e2);
-        }
-      });
-      psup[eid] = c;
-    });
-    run_jobs(reg_list.size(), [&](uint32_t, uint64_t i) {
-      uint32_t e = reg_list[i];
-      sup[e].store(psup[e]);
-      if (e == 3724 && BT_WATCH >= 0)
-        fprintf(stderr, "[init3724] psup=%u tau=%u\n", psup[e], tau[e]);
-    });
-    std::vector<std::pair<uint32_t, uint32_t>> evs;
-    for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t e : evt_t[t]) evs.push_back({tau[e] >= 2 ? tau[e] - 2 : 0, e});
-    evs.shrink_to_fit();
-    std::sort(evs.begin(), evs.end());
-    size_t evw = 0;
-    for (size_t i = 0; i < evs.size(); ++i) {
-      if (i > 0 && evs[i].second == evs[evw - 1].second) continue;
-      evs[evw++] = evs[i];
-    }
-    evs.resize(evw);
-    for (auto& ev : evs) ub_in[ev.second] = 1;
-    for (uint32_t e : reg_list) palive[e] = 1;
-    for (auto& ev : evs) palive[ev.second] = 1;
-    uint32_t maxsup = 0;
-    for (uint32_t e : reg_list)
-      if (psup[e] > maxsup) maxsup = psup[e];
-    std::vector<std::vector<uint32_t>> buckets(maxsup + 1);
-    for (uint32_t e : reg_list) buckets[psup[e]].push_back(e);
-    uint32_t popped = 0;
-    size_t evptr = 0;
-    StampSet& st0 = stamps[0];
-    for (uint32_t s = 0; s <= maxsup; ++s) {
-      while (evptr < evs.size() && evs[evptr].first == s) {
-        uint32_t X = evs[evptr++].second;
-        if (BT_WATCH >= 0) fprintf(stderr, "[vev] s=%u eid=%u\n", s, X);
-        palive[X] = 0;
-        st.evals++;
-        uint32_t a = g.eu[X], b = g.ev[X];
-        st0.next_epoch();
-        for (auto& r : g.adj[a]) st0.mark(r.nbr, r.eid);
-        for (auto& r : g.adj[b]) {
-          if (!st0.test(r.nbr)) continue;
-          uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
-          uint32_t mm[2] = {e1, e2};
-          for (uint32_t mi = 0; mi < 2; ++mi) {
-            uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
-            psup[m]--;
-            if (m == 3724 && BT_WATCH >= 0)
-              fprintf(stderr, "[vdec3724] s=%u src=%u psup->%u\n", s, X, psup[m]);
-            buckets[psup[m]].push_back(m);
-          }
-        }
+  void build_frontier(std::vector<uint32_t>& seeds, BatchStats& st) {
+    for (uint32_t e : seeds) {
+      if (!g.alive(e)) {
+        in_next[e] = 0;
+        continue;
       }
-      auto& bkt = buckets[s];
-      for (size_t i = 0; i < bkt.size(); ++i) {
-        uint32_t eid = bkt[i];
-        if (!palive[eid] || psup[eid] != s) continue;
-        tau[eid] = (uint16_t)(s + 2);
-        palive[eid] = 0;
-        popped++;
-        st.evals++;
-        if (BT_WATCH >= 0) fprintf(stderr, "[rpop] s=%u eid=%u psup=%u\n", s, eid, psup[eid]);
-        uint32_t a = g.eu[eid], b = g.ev[eid];
-        st0.next_epoch();
-        for (auto& r : g.adj[a]) st0.mark(r.nbr, r.eid);
-        for (auto& r : g.adj[b]) {
-          if (!st0.test(r.nbr)) continue;
-          uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
-          uint32_t mm[2] = {e1, e2};
-          for (uint32_t mi = 0; mi < 2; ++mi) {
-            uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
-            psup[m]--;
-            if (m == 3724 && BT_WATCH >= 0)
-              fprintf(stderr, "[pdec3724] s=%u src=%u psup->%u\n", s, eid, psup[m]);
-            buckets[psup[m]].push_back(m);
-          }
-        }
+      if (!in_next[e]) {
+        in_next[e] = 1;
+        frontier.push_back(e);
       }
     }
-    if (popped != reg_list.size()) {
-      fprintf(stderr, "region peel incomplete: popped=%u region=%zu\n", popped, reg_list.size());
-      exit(1);
-    }
-    if (BT_WATCH >= 0) fprintf(stderr, "[peel-out] popped=%u\n", popped);
-    for (uint32_t e : reg_list) palive[e] = 0;
-    for (auto& ev : evs) {
-      palive[ev.second] = 0;
-      ub_in[ev.second] = 0;
-      dead_mark[ev.second] = 0;
-    }
+    st.seeds += frontier.size();
   }
 
   bool apply_batch(const std::vector<Op>& raw) {
@@ -317,8 +201,8 @@ public:
     stats.deltas += dels.size() + ins.size();
     stats.del_deltas += dels.size();
     stats.ins_deltas += ins.size();
-    if (!dels.empty()) { if (BT_WATCH >= 0) fprintf(stderr, "[pd-in] %zu\n", dels.size()); phase_deletions(dels); if (BT_WATCH >= 0) fprintf(stderr, "[pd-out]\n"); }
-    if (!ins.empty()) { if (BT_WATCH >= 0) fprintf(stderr, "[pi-in] %zu\n", ins.size()); phase_insertions(ins); if (BT_WATCH >= 0) fprintf(stderr, "[pi-out]\n"); }
+    if (!dels.empty()) phase_deletions(dels);
+    if (!ins.empty()) phase_insertions(ins);
     return true;
   }
 
@@ -354,7 +238,6 @@ public:
         for (auto& r : g.adj[v]) seeds_t[tid].push_back(r.eid);
       }
     });
-    if (BT_WATCH >= 0) fprintf(stderr, "[pd-enum-done]\n");
     for (uint32_t e : dels) {
       if (!g.alive(e)) continue;
       g.remove_edge(e);
@@ -362,14 +245,51 @@ public:
       sup[e].store(0);
       dead_mark[e] = 0;
     }
-    std::vector<uint32_t> seeds;
-    for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t e : seeds_t[t]) seeds.push_back(e);
-    reg_list.clear();
-    region_closure(seeds, stats);
-    region_peel(stats);
-    for (uint32_t e : reg_list) in_reg[e] = 0;
-    reg_list.clear();
+    frontier.clear();
+    for (uint32_t t = 0; t < T; ++t) build_frontier(seeds_t[t], stats);
+    fixpoint(false, stats);
+  }
+
+  void discovery_rounds() {
+    uint32_t round = 0;
+    while (!frontier.empty()) {
+      round++;
+      if (stats.region_max < frontier.size()) stats.region_max = frontier.size();
+      for (uint32_t t = 0; t < T; ++t) {
+        chg_e[t].clear();
+        nxt_t[t].clear();
+      }
+      uint64_t fsz = frontier.size();
+      run_jobs(fsz, [&](uint32_t tid, uint64_t i) {
+        uint32_t eid = frontier[i];
+        if (!g.alive(eid) || in_reg[eid]) return;
+        stats.evals++;
+        uint32_t mm = eval_wmax_pot(g.eu[eid], g.ev[eid], stamps[tid]);
+        uint32_t sc = sup[eid].load() + 2;
+        uint32_t nve = sc < mm ? sc : mm;
+        if (nve < 2) nve = 2;
+        if (nve > (uint32_t)tau[eid]) chg_e[tid].push_back(eid);
+      });
+      for (uint32_t e : frontier) ub_in[e] = 0;
+      next.clear();
+      for (uint32_t t = 0; t < T; ++t)
+        for (uint32_t f : chg_e[t]) {
+          uint32_t sc = sup[f].load() + 2;
+          ubc[f] = sc;
+          tau[f] = (uint16_t)sc;
+          in_reg[f] = 1;
+          reg_list.push_back(f);
+          expand_local(t, f, ub_in, nxt_t[t]);
+        }
+      for (uint32_t t = 0; t < T; ++t)
+        for (uint32_t e : nxt_t[t]) next.push_back(e);
+      std::swap(frontier, next);
+      if (round > 100000) {
+        fprintf(stderr, "discovery round overflow\n");
+        exit(1);
+      }
+    }
+    stats.rounds += round;
   }
 
   void phase_insertions(std::vector<std::pair<uint32_t, uint32_t>>& ins) {
@@ -430,21 +350,58 @@ public:
       dcount[allmates[i].second].fetch_add(1);
     });
     reg_list.clear();
-    std::vector<uint32_t> seeds;
-    for (uint64_t i = 0; i < B; ++i) seeds.push_back(neweids[i]);
+    frontier.clear();
+    for (uint64_t i = 0; i < B; ++i) {
+      uint32_t e = neweids[i];
+      uint32_t sc = sup[e].load() + 2;
+      ubc[e] = sc;
+      tau[e] = (uint16_t)sc;
+      in_reg[e] = 1;
+      reg_list.push_back(e);
+    }
     run_jobs(M, [&](uint32_t tid, uint64_t i) {
       uint32_t f = allmates[i].first;
-      if (dcount[f].load() > 0) dl[tid].push_back(f);
+      if (dcount[f].load() > 0 && !in_reg[f]) {
+        uint32_t sc = sup[f].load() + 2;
+        ubc[f] = sc;
+        tau[f] = (uint16_t)sc;
+        in_reg[f] = 1;
+        dl[tid].push_back(f);
+      }
       f = allmates[i].second;
-      if (dcount[f].load() > 0) dl[tid].push_back(f);
+      if (dcount[f].load() > 0 && !in_reg[f]) {
+        uint32_t sc = sup[f].load() + 2;
+        ubc[f] = sc;
+        tau[f] = (uint16_t)sc;
+        in_reg[f] = 1;
+        dl[tid].push_back(f);
+      }
     });
+    for (uint64_t i = 0; i < B; ++i) expand_local(0, neweids[i], ub_in, frontier);
     for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t f : dl[t]) seeds.push_back(f);
-    region_closure(seeds, stats);
-    region_peel(stats);
-    for (uint32_t e : reg_list) in_reg[e] = 0;
+      for (uint32_t f : dl[t]) {
+        reg_list.push_back(f);
+        expand_local(0, f, ub_in, frontier);
+      }
+    discovery_rounds();
+    if (watch_eid >= 0)
+      fprintf(stderr, "[watch] eid=%d after ub: tau=%u in_reg=%u in_next=%u ub_in=%u in_reglist=%u\n",
+              (int)watch_eid, (unsigned)tau[watch_eid], (unsigned)in_reg[watch_eid],
+              (unsigned)in_next[watch_eid], (unsigned)ub_in[watch_eid],
+              (unsigned)std::count(reg_list.begin(), reg_list.end(), (uint32_t)watch_eid));
+    frontier.clear();
+    build_frontier(reg_list, stats);
+    if (watch_eid >= 0)
+      fprintf(stderr, "[watch] eid=%d demote frontier: %u\n", (int)watch_eid,
+              (unsigned)std::count(frontier.begin(), frontier.end(), (uint32_t)watch_eid));
+    fixpoint(false, stats);
+    if (watch_eid >= 0)
+      fprintf(stderr, "[watch] eid=%d after demote: tau=%u\n", (int)watch_eid, (unsigned)tau[watch_eid]);
+    for (uint32_t f : reg_list) in_reg[f] = 0;
     reg_list.clear();
-  }  void grow_structures(uint32_t eid) {
+  }
+
+  void grow_structures(uint32_t eid) {
     size_t nsz = (size_t)std::max<uint64_t>(eid + 1, (g.eu.size() ? g.eu.size() * 2 : 1024));
     g.eu.resize(nsz, UINT32_MAX);
     g.ev.resize(nsz, UINT32_MAX);
@@ -455,8 +412,6 @@ public:
     ub_in.resize(nsz, 0);
     ubc.resize(nsz, 0);
     dead_mark.resize(nsz, 0);
-    psup.resize(nsz, 0);
-    palive.resize(nsz, 0);
     tau.resize(nsz, 0);
     auto nsup = std::make_unique<std::atomic<uint32_t>[]>(nsz);
     auto ndc = std::make_unique<std::atomic<uint32_t>[]>(nsz);

@@ -35,13 +35,13 @@ int main(int argc, char** argv) {
     bm = new BatchMaintainer(g, 1, reserve);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
-      if (we >= 0) bm->watch_eid = we;
+      if (we >= 0) { bm->watch_eid = we; BT_WATCH = we; }
     }
   } else {
     pm = new PerEdgeMaintainer(g);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
-      if (we >= 0) WATCH_EID = we;
+      if (we >= 0) { WATCH_EID = we; BT_WATCH = we; }
       fprintf(stderr, "[trace] watch eid=%lld\n", we);
     }
   }
@@ -109,6 +109,7 @@ int main(int argc, char** argv) {
            (unsigned long long)pm->stats.evals, pm->stats.region_max,
            (unsigned long long)pm->stats.region_sum, (unsigned long long)opi);
   } else {
+    std::vector<uint16_t> prev_tau;
     uint64_t opi = 0;
     for (size_t bi = 0; bi < stream.size(); ++bi) {
       auto& b = stream[bi];
@@ -123,7 +124,15 @@ int main(int argc, char** argv) {
           opi++;
         }
       } else {
+        uint32_t ch = 0; uint64_t s1 = 0, s2 = 0;
+        for (uint32_t e = 0; e < g.cap_edges; ++e)
+          if (g.alive(e)) s1 += bm->tau[e];
         bm->apply_batch(b);
+        for (uint32_t e = 0; e < g.cap_edges; ++e)
+          if (g.alive(e)) { s2 += bm->tau[e]; if (e >= prev_tau.size() || bm->tau[e] != prev_tau[e]) ch++; }
+        printf("BATCHSTAT batch %zu size %zu changed_edges=%u tausum %llu->%llu\n", bi, b.size(), ch,
+               (unsigned long long)s1, (unsigned long long)s2);
+        prev_tau.assign(bm->tau.begin(), bm->tau.end());
         if (!check("batch", opi, &b[0])) {
           printf("batch index %zu size %zu\n", bi, b.size());
           for (auto& op : b) printf("  %c %u %u\n", op.del ? 'D' : 'I', op.u, op.v);
