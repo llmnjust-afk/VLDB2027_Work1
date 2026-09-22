@@ -4,7 +4,7 @@
 # Usage: run_perf.sh [DATA] [OUT]
 DATA=${1:-/data/lab/data}
 OUT=${2:-/data/lab/results}
-SCALE_THREADS=${SCALE_THREADS:-"1 2 4 8 16 32 64 128 256"}
+SCALE_THREADS=${SCALE_THREADS:-"1 8 32 256"}
 mkdir -p "$OUT"
 cd "$(dirname "$0")/.."
 B=./batchtruss
