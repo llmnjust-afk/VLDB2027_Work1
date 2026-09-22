@@ -1,9 +1,0 @@
-batchtruss/batchtruss
-batchtruss/debug_bisect
-batchtruss/core
-batchtruss/data/*.gz
-batchtruss/data/initial.txt
-batchtruss/data/stream.txt
-batchtruss/results/*.csv
-*.o
-*.swp
