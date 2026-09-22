@@ -167,7 +167,7 @@ public:
     if (risen.size() > stats.region_max) stats.region_max = risen.size();
     stats.region_sum += risen.size();
     queue.clear();
-    for (uint32_t f : risen) {
+    for (uint32_t f : region) {
       inq[f] = 1;
       queue.push_back(f);
     }

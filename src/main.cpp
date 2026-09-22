@@ -6,8 +6,10 @@
 
 static std::string g_dataset = "NA";
 
+static std::string g_stream_name = "NA";
+
 static void csv_header() {
-  printf("dataset,method,threads,ablate,batch_size,nbatches,run,build_s,total_maint_s,"
+  printf("dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,"
          "lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,"
          "region_max,rss_mb,verify_ok,verify_s,final_m,final_n\n");
 }
@@ -20,9 +22,9 @@ static void csv_row(const std::string& method, uint32_t threads, const std::stri
   LatStats L;
   L.compute(lats);
   double eps = maint_s > 0 ? (double)((uint64_t)nb * bsize) / maint_s : 0;
-  printf("%s,%s,%u,%s,%u,%u,%u,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.1f,%llu,%llu,%llu,%llu,%.0f,"
+  printf("%s,%s,%u,%s,%s,%u,%u,%u,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.1f,%llu,%llu,%llu,%llu,%.0f,"
          "%d,%.3f,%llu,%u\n",
-         g_dataset.c_str(), method.c_str(), threads, ablate.c_str(), bsize, nb, run, build_s,
+         g_dataset.c_str(), method.c_str(), threads, ablate.c_str(), g_stream_name.c_str(), bsize, nb, run, build_s,
          maint_s, L.mean * 1e3, L.p50 * 1e3, L.p99 * 1e3, L.mx * 1e3, eps,
          (unsigned long long)evals, (unsigned long long)seeds, (unsigned long long)rounds,
          (unsigned long long)region_max, (double)peak_rss_mb(), verify_ok ? 1 : 0, verify_s,
@@ -88,7 +90,8 @@ static void run_batch(DynGraph& g, const std::vector<std::vector<Op>>& stream, u
   double maint = now_s() - t1;
   ok = verify_now(g, bm.tau, vs) && ok;
   BatchStats* st = &bm.stats;
-  csv_row("batch", threads, ablate, 0, (uint32_t)stream.size(), run_id, build_s, maint, lats,
+  uint32_t obs_bs = stream.empty() || stream[0].empty() ? 0 : (uint32_t)stream[0].size();
+  csv_row("batch", threads, ablate, obs_bs, (uint32_t)stream.size(), run_id, build_s, maint, lats,
           st->evals, st->seeds, st->rounds, st->region_max, ok, vs, g.m, g.n);
 }
 
@@ -114,7 +117,8 @@ static void run_peredge(DynGraph& g, const std::vector<std::vector<Op>>& stream,
   }
   double maint = now_s() - t1;
   ok = verify_now(g, pm.tau, vs) && ok;
-  csv_row("peredge", 1, "-", 0, (uint32_t)stream.size(), run_id, build_s, maint, lats,
+  uint32_t obs_bs = stream.empty() || stream[0].empty() ? 0 : (uint32_t)stream[0].size();
+  csv_row("peredge", 1, "-", obs_bs, (uint32_t)stream.size(), run_id, build_s, maint, lats,
           pm.stats.evals, 0, 0, pm.stats.region_max, ok, vs, g.m, g.n);
 }
 
@@ -274,6 +278,12 @@ int main(int argc, char** argv) {
     for (uint32_t r = 0; r < runs; ++r) {
       DynGraph g = DynGraph::load(arg_s(a, "--graph", ""));
       auto stream = load_stream(arg_s(a, "--stream", ""));
+      {
+        std::string sp = arg_s(a, "--stream", "");
+        uint32_t b0 = (uint32_t)sp.rfind('/'), b1 = (uint32_t)sp.rfind('.');
+        if (b0 == UINT32_MAX) b0 = 0; else b0 += 1;
+        g_stream_name = (b1 > b0 && b1 != UINT32_MAX) ? sp.substr(b0, b1 - b0) : sp.substr(b0);
+      }
       if (cmd == "peredge")
         run_peredge(g, stream, r, check_every);
       else

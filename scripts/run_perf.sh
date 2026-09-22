@@ -29,7 +29,7 @@ worker() {
     for pi in 1.0 0.5 0.0; do
       st=$S/${gname}_b${bs}_p${pi}.txt
       [ -s "$st" ] || continue
-      grep -q "${gname}_b${bs}_p${pi}.txt," "$csv" 2>/dev/null && continue
+      grep -q ",${gname},${gname}_b${bs}_p${pi}," "$csv" 2>/dev/null && continue
       $B batch --graph "$graph" --stream "$st" --threads 32 --ablate full --runs 3 --dataset $gname >> "$csv" 2>/dev/null
       echo "[$gname] grid $(basename $st)"
     done
@@ -40,17 +40,17 @@ worker() {
     ncsv=$OUT/batch_${gname}_scale.csv
     touch "$ncsv"
     for t in $SCALE_THREADS; do
-      grep -q "${gname}_b1000_p0.5.txt,$t," "$ncsv" 2>/dev/null && continue
+      grep -q ",${gname},${gname}_b1000_p0.5,$t," "$ncsv" 2>/dev/null && continue
       $B batch --graph "$graph" --stream "$st" --threads $t --ablate full --runs 3 --dataset $gname >> "$ncsv" 2>/dev/null
       echo "[$gname] scale t$t"
     done
     # ablation nomerge at T=32
     nmcsv=$OUT/nomerge_${gname}_t32.csv; touch "$nmcsv"
-    grep -q "${gname}_b1000_p0.5.txt," "$nmcsv" 2>/dev/null || \
+    grep -q ",${gname},${gname}_b1000_p0.5," "$nmcsv" 2>/dev/null || \
       $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs 3 --dataset $gname >> "$nmcsv" 2>/dev/null
     # static recompute on same stream
     scsv=$OUT/static_${gname}.csv; touch "$scsv"
-    grep -q "${gname}_b1000_p0.5.txt," "$scsv" 2>/dev/null || \
+    grep -q ",${gname},${gname}_b1000_p0.5," "$scsv" 2>/dev/null || \
       $B static --graph "$graph" --stream "$st" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
     echo "[$gname] nomerge+static b1000"
   fi
@@ -61,7 +61,7 @@ worker() {
         st=$S/${gname}_s_b${bs}_p0.5.txt
         [ -s "$st" ] || continue
         pcsv=$OUT/peredge_${gname}.csv; touch "$pcsv"
-        grep -q "${gname}_s_b${bs}_p0.5.txt," "$pcsv" 2>/dev/null || \
+        grep -q ",${gname},${gname}_s_b${bs}_p0.5," "$pcsv" 2>/dev/null || \
           $B peredge --graph "$graph" --stream "$st" --dataset $gname >> "$pcsv" 2>/dev/null
         echo "[$gname] peredge b$bs"
       done ;;
