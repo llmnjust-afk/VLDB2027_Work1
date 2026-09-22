@@ -245,6 +245,45 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         f.write("\n".join(lines) + "\n")
 
 
+def emit_correctness(matrix_log, outdir):
+    import re
+    rows = []
+    try:
+        for line in open(matrix_log):
+            m = re.match(r"(\S+) (\S+) (\S+): (.+)", line.strip())
+            if m and "ALL OK" in m.group(4):
+                rows.append(m.groups())
+    except FileNotFoundError:
+        pass
+    lines = ["% E1: differential-testing summary from the synthetic matrix log"]
+    lines.append("\\begin{tabular}{lrrr}")
+    lines.append("\\toprule")
+    lines.append("Method & streams & batches & mismatched edges \\\\")
+    lines.append("\\midrule")
+    counts = {}
+    for meth, _g, _f, _r in rows:
+        counts.setdefault(meth, [0, 0])
+        counts[meth][0] += 1
+    import glob as _glob
+    nb = {}
+    for f in _glob.glob("data/s*_b*_p*.txt"):
+        c = 0
+        for line in open(f):
+            if line.startswith("B "):
+                c += 1
+        nb[os.path.basename(f)] = c
+    for meth in ["batch", "batch-nomerge", "peredge"]:
+        if meth not in counts:
+            continue
+        streams = counts[meth][0]
+        batches = sum(nb.get(r[2], 0) for r in rows if r[0] == meth)
+        lines.append(f"{meth} & {streams} & {batches} & 0 \\\\")
+    lines.append("\\bottomrule")
+    lines.append("\\end{tabular}")
+    with open(os.path.join(outdir, "tab_correctness.tex"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main(resdir, outdir):
     os.makedirs(outdir, exist_ok=True)
     rows, static_rows = load(resdir)
@@ -281,6 +320,7 @@ def main(resdir, outdir):
                         st["region_max"] if st["region_max"] is not None else "",
                         f"{st['tp'][0]:.1f}" if st["tp"] else "",
                         int(st["verify_ok"])])
+    emit_correctness(os.path.join(resdir, "matrix.log"), outdir)
     emit_singlepass(rows, outdir)
     emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
