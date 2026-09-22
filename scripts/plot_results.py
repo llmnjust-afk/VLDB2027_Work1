@@ -52,7 +52,12 @@ def load(resdir):
                 except (TypeError, ValueError):
                     continue
                 rows.append(r)
-    return rows, static_rows
+    dedup = {}
+    for r in rows:
+        k = (r.get("dataset"), r.get("method"), r.get("ablate"), r.get("stream"), r.get("threads"), r.get("run"))
+        if k not in dedup:
+            dedup[k] = r
+    return list(dedup.values()), static_rows
 
 
 def aggregate(rows):
@@ -186,6 +191,60 @@ def emit_regions(agg, outdir):
         f.write("\n".join(lines) + "\n")
 
 
+def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
+    import statistics
+    by = {}
+    for r in rows:
+        by.setdefault((r["dataset"], r["method"], r["ablate"], r["stream"], r["threads"]), []).append(r)
+    lines = ["% E2: cost decomposition at B=" + ref_b + " p=" + ref_p + " T=32 (peredge scaled to batch-equivalent)"]
+    lines.append("\\begin{tabular}{lrrrr}")
+    lines.append("\\toprule")
+    lines.append("Method & ms/batch & evals/batch & peels/batch & region max \\\\")
+    lines.append("\\midrule")
+    cells = {}
+    for g in GRAPH_ORDER:
+        s = f"{g}_b{ref_b}_p{ref_p}"
+        sp = f"{g}_s_b{ref_b}_p{ref_p}"
+        for name, key in [("Batch", (g, "batch", "full", s, "32")),
+                          ("No-merge", (g, "batch", "nomerge", s, "32")),
+                          ("PerEdge", (g, "peredge", "-", sp, "1"))]:
+            rs = by.get(key)
+            if not rs:
+                continue
+            ms = [float(r["lat_mean_ms"]) for r in rs]
+            nb = float(rs[0].get("nbatches") or 1)
+            bsz = float(rs[0].get("batch_size") or 1)
+            ev = [float(r["evals"]) / nb for r in rs]
+            sd = [float(r["seeds"]) / nb for r in rs]
+            rm = [int(float(r["region_max"])) for r in rs if r.get("region_max")]
+            if name == "PerEdge":
+                ms = [m * bsz for m in ms]
+                ev = [float(r["evals"]) / nb for r in rs]
+                cells.setdefault(name, []).append((statistics.mean(ms), statistics.mean(ev), None, None))
+            else:
+                peels = 1.0 if name == "Batch" else statistics.mean(sd)
+                cells.setdefault(name, []).append((statistics.mean(ms), statistics.mean(ev), peels, max(rm) if rm else None))
+    for name in ["Batch", "No-merge", "PerEdge"]:
+        rowsv = cells.get(name)
+        if not rowsv:
+            continue
+        m = statistics.mean([r[0] for r in rowsv])
+        e = statistics.mean([r[1] for r in rowsv])
+        pl = [r[2] for r in rowsv if r[2] is not None]
+        rm = [r[3] for r in rowsv if r[3] is not None]
+        pmean = statistics.mean(pl) if pl else None
+        rmax = max(rm) if rm else None
+        c1 = f"{m:.2f}"
+        c2 = f"{e:,.0f}".replace(",", "\\,")
+        c3 = "1" if name == "Batch" else (f"{pmean:,.1f}".replace(",", "\\,") if pmean else "--")
+        c4 = f"{int(rmax)}" if rmax else "--"
+        lines.append(f"{name} & {c1} & {c2} & {c3} & {c4} \\\\")
+    lines.append("\\bottomrule")
+    lines.append("\\end{tabular}")
+    with open(os.path.join(outdir, "tab_singlepass.tex"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main(resdir, outdir):
     os.makedirs(outdir, exist_ok=True)
     rows, static_rows = load(resdir)
@@ -222,6 +281,7 @@ def main(resdir, outdir):
                         st["region_max"] if st["region_max"] is not None else "",
                         f"{st['tp'][0]:.1f}" if st["tp"] else "",
                         int(st["verify_ok"])])
+    emit_singlepass(rows, outdir)
     emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
     emit_regions(agg, outdir)
