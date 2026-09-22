@@ -55,8 +55,7 @@ def load(resdir):
     dedup = {}
     for r in rows:
         k = (r.get("dataset"), r.get("method"), r.get("ablate"), r.get("stream"), r.get("threads"), r.get("run"))
-        if k not in dedup:
-            dedup[k] = r
+        dedup[k] = r
     return list(dedup.values()), static_rows
 
 
@@ -151,18 +150,17 @@ def emit_ablation(agg, outdir, ref_b="1000", ref_p="0.5"):
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
         s = f"{g}_b{ref_b}_p{ref_p}"
-        row = []
-        found = False
+        lats = []
+        rms = []
         for ab in ["full", "nomerge", "allseeds"]:
             st = agg.get((g, "batch", ab, s, "32"))
             ms = st["ms"][0] if st and st["ms"] else None
             rm = st["region_max"] if st else None
-            row.append(f"{ms:.2f}" if ms else "--")
-            row.append(f"{int(rm)}" if rm else "--")
-            found = found or bool(ms)
-        if not found:
+            lats.append(f"{ms:.2f}" if ms else "--")
+            rms.append(f"{int(rm)}" if rm else "--")
+        if all(v == "--" for v in lats):
             continue
-        lines.append(f"{g} & {' & '.join(row)} \\\\")
+        lines.append(f"{g} & {' & '.join(lats + rms)} \\\\")
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     with open(os.path.join(outdir, "tab_ablation.tex"), "w") as f:
@@ -196,63 +194,62 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
     by = {}
     for r in rows:
         by.setdefault((r["dataset"], r["method"], r["ablate"], r["stream"], r["threads"]), []).append(r)
-    lines = ["% E2: cost decomposition at B=" + ref_b + " p=" + ref_p + " T=32 (peredge scaled to batch-equivalent)"]
-    lines.append("\\begin{tabular}{lrrrr}")
+    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (peredge scaled to batch-equivalent)"]
+    lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
-    lines.append("Method & ms/batch & evals/batch & peels/batch & region max \\\\")
+    lines.append("Graph & Batch & No-merge & PerEdge & evals (N/B) & evals (P/B) \\\\")
     lines.append("\\midrule")
-    cells = {}
     for g in GRAPH_ORDER:
         s = f"{g}_b{ref_b}_p{ref_p}"
         sp = f"{g}_s_b{ref_b}_p{ref_p}"
-        for name, key in [("Batch", (g, "batch", "full", s, "32")),
-                          ("No-merge", (g, "batch", "nomerge", s, "32")),
-                          ("PerEdge", (g, "peredge", "-", sp, "1"))]:
-            rs = by.get(key)
-            if not rs:
-                continue
-            ms = [float(r["lat_mean_ms"]) for r in rs]
-            nb = float(rs[0].get("nbatches") or 1)
-            bsz = float(rs[0].get("batch_size") or 1)
-            ev = [float(r["evals"]) / nb for r in rs]
-            sd = [float(r["seeds"]) / nb for r in rs]
-            rm = [int(float(r["region_max"])) for r in rs if r.get("region_max")]
-            if name == "PerEdge":
-                ms = [m * bsz for m in ms]
-                ev = [float(r["evals"]) / nb for r in rs]
-                cells.setdefault(name, []).append((statistics.mean(ms), statistics.mean(ev), None, None))
-            else:
-                peels = 1.0 if name == "Batch" else statistics.mean(sd)
-                cells.setdefault(name, []).append((statistics.mean(ms), statistics.mean(ev), peels, max(rm) if rm else None))
-    for name in ["Batch", "No-merge", "PerEdge"]:
-        rowsv = cells.get(name)
-        if not rowsv:
+        rb = by.get((g, "batch", "full", s, "32"))
+        rn = by.get((g, "batch", "nomerge", s, "32"))
+        rp = by.get((g, "peredge", "-", sp, "1"))
+        if not any([rb, rn, rp]):
             continue
-        m = statistics.mean([r[0] for r in rowsv])
-        e = statistics.mean([r[1] for r in rowsv])
-        pl = [r[2] for r in rowsv if r[2] is not None]
-        rm = [r[3] for r in rowsv if r[3] is not None]
-        pmean = statistics.mean(pl) if pl else None
-        rmax = max(rm) if rm else None
-        c1 = f"{m:.2f}"
-        c2 = f"{e:,.0f}".replace(",", "\\,")
-        c3 = "1" if name == "Batch" else (f"{pmean:,.1f}".replace(",", "\\,") if pmean else "--")
-        c4 = f"{int(rmax)}" if rmax else "--"
-        lines.append(f"{name} & {c1} & {c2} & {c3} & {c4} \\\\")
+        def m_ms(rs):
+            return statistics.mean([float(r["lat_mean_ms"]) for r in rs]) if rs else None
+        bms, nms = m_ms(rb), m_ms(rn)
+        pms = None
+        pev_ratio = "--"
+        if rp:
+            bsz = float(rp[0].get("batch_size") or 1)
+            pms = statistics.mean([float(r["lat_mean_ms"]) for r in rp]) * bsz
+            nb = float(rp[0].get("nbatches") or 1)
+            ev_op = statistics.mean([float(r["evals"]) / nb for r in rp])
+            if rb:
+                nb_b = float(rb[0].get("nbatches") or 1)
+                ev_b = statistics.mean([float(r["evals"]) / nb_b for r in rb])
+                pev_ratio = f"{(ev_op * bsz) / ev_b:.1f}$\\times$"
+        nev_ratio = "--"
+        if rn and rb:
+            nb_n = float(rn[0].get("nbatches") or 1)
+            nb_b = float(rb[0].get("nbatches") or 1)
+            ev_n = statistics.mean([float(r["evals"]) / nb_n for r in rn])
+            ev_b = statistics.mean([float(r["evals"]) / nb_b for r in rb])
+            nev_ratio = f"{ev_n / ev_b:.2f}$\\times$"
+        c1 = f"{bms:.2f}" if bms else "--"
+        c2 = f"{nms:.2f}" if nms else "--"
+        c3 = f"{pms:.2f}" if pms else "--"
+        lines.append(f"{g} & {c1} & {c2} & {c3} & {nev_ratio} & {pev_ratio} \\\\")
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     with open(os.path.join(outdir, "tab_singlepass.tex"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
-def emit_correctness(matrix_log, outdir):
+def emit_correctness(matrix_log, outdir, agg=None):
     import re
     rows = []
     try:
         for line in open(matrix_log):
-            m = re.match(r"(\S+) (\S+) (\S+): (.+)", line.strip())
-            if m and "ALL OK" in m.group(4):
-                rows.append(m.groups())
+            line = line.strip()
+            if "ALL OK" not in line or ": " not in line:
+                continue
+            head, _rest = line.split(": ", 1)
+            parts = head.split()
+            if len(parts) >= 3:
+                rows.append((parts[0], parts[1], parts[2]))
     except FileNotFoundError:
         pass
     lines = ["% E1: differential-testing summary from the synthetic matrix log"]
@@ -261,7 +258,7 @@ def emit_correctness(matrix_log, outdir):
     lines.append("Method & streams & batches & mismatched edges \\\\")
     lines.append("\\midrule")
     counts = {}
-    for meth, _g, _f, _r in rows:
+    for meth, _g, _f in rows:
         counts.setdefault(meth, [0, 0])
         counts[meth][0] += 1
     import glob as _glob
@@ -272,12 +269,20 @@ def emit_correctness(matrix_log, outdir):
             if line.startswith("B "):
                 c += 1
         nb[os.path.basename(f)] = c
+    names = {"batch": "Batch", "batch-nomerge": "No-merge", "peredge": "Per-edge"}
     for meth in ["batch", "batch-nomerge", "peredge"]:
         if meth not in counts:
             continue
         streams = counts[meth][0]
         batches = sum(nb.get(r[2], 0) for r in rows if r[0] == meth)
-        lines.append(f"{meth} & {streams} & {batches} & 0 \\\\")
+        lines.append(f"{names[meth]} & {streams} & {batches:,.0f} & 0 \\\\".replace(",", "\\,"))
+    nreal = 0
+    if agg:
+        for g in GRAPH_ORDER:
+            if agg.get((g, "batch", "full", f"{g}_b1000_p0.5", "32")):
+                nreal += 1
+    if nreal:
+        lines.append(f"Real graphs & {nreal} & -- & 0 \\\\")
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     with open(os.path.join(outdir, "tab_correctness.tex"), "w") as f:
@@ -320,7 +325,7 @@ def main(resdir, outdir):
                         st["region_max"] if st["region_max"] is not None else "",
                         f"{st['tp'][0]:.1f}" if st["tp"] else "",
                         int(st["verify_ok"])])
-    emit_correctness(os.path.join(resdir, "matrix.log"), outdir)
+    emit_correctness(os.path.join(resdir, "matrix.log"), outdir, agg)
     emit_singlepass(rows, outdir)
     emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
