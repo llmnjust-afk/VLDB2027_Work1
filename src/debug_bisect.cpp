@@ -8,6 +8,7 @@ int main(int argc, char** argv) {
   std::string graph_path = "data/synth1.txt", stream_path = "", method = "peredge";
   uint32_t wu = UINT32_MAX, wv = UINT32_MAX;
   uint32_t check_every = 1;
+  uint32_t nthreads = 1;
   for (size_t i = 0; i + 1 < a.size(); ++i) {
     if (a[i] == "--graph") graph_path = a[i + 1];
     if (a[i] == "--stream") stream_path = a[i + 1];
@@ -15,10 +16,11 @@ int main(int argc, char** argv) {
     if (a[i] == "--check-every") check_every = (uint32_t)atoll(a[i + 1].c_str());
     if (a[i] == "--watch-u") wu = (uint32_t)atoll(a[i + 1].c_str());
     if (a[i] == "--watch-v") wv = (uint32_t)atoll(a[i + 1].c_str());
+    if (a[i] == "--threads") nthreads = (uint32_t)atoll(a[i + 1].c_str());
   }
   DynGraph g = DynGraph::load(graph_path);
   auto stream = load_stream(stream_path);
-  StaticTruss base = static_truss(g, 1);
+  StaticTruss base = static_truss(g, nthreads);
   uint32_t tmax = 0;
   for (uint32_t e = 0; e < g.cap_edges; ++e)
     if (g.alive(e) && base.tau[e] > tmax) tmax = base.tau[e];
@@ -32,7 +34,7 @@ int main(int argc, char** argv) {
     for (auto& b : stream)
       for (auto& op : b)
         if (!op.del) reserve++;
-    bm = new BatchMaintainer(g, 1, reserve);
+    bm = new BatchMaintainer(g, nthreads, reserve);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
       if (we >= 0) { bm->watch_eid = we; BT_WATCH = we; }

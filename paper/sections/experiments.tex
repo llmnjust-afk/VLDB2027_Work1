@@ -7,9 +7,9 @@ Our code, the stream generator, and the scripts that reproduce every table and f
 \paragraph{Setup}
 \label{par:setup}
 \textbf{Datasets.}
-We use eight public graphs spanning three structural regimes: single dense community (email-Enron, wiki-Vote, Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
+We use eight public graphs spanning three structural regimes: single dense community (email-Eu-core, wiki-Vote, email-Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
 \textbf{Streams.}
-For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.75, 0.5, 0.25, 0.0\}$; the stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
+For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; the stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
 \textbf{Metrics.}
 Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, region size, event count, and speedup over the two baselines.
 \textbf{Baselines.}
@@ -83,24 +83,28 @@ skitter & XX & XX & XX & XX & XX \\
 
 \paragraph{Scaling (E4)}
 \label{par:scaling}
-Thread-scaling curves for the $B{=}1000$, $p{=}0.5$ workload on each graph are summarized in \Cref{tab:scaling}.
-The parallel phases (enumeration, closure, recount) scale to $T{=}32$; the sequential sweep bounds the tail, and the end-to-end speedup of the whole batch algorithm over its own $T{=}1$ configuration reaches XX$\times$ on the community graphs.
+We evaluate thread scaling on the $B{=}1000$, $p{=}0.5$ workload of each graph, sweeping $T\in\{1,2,4,8,16,32,64,128,256\}$ (\Cref{tab:scaling}).
+The design goal is not speedup but the absence of pathological degradation: with adaptive dispatch, phases whose task counts fall below the dispatch threshold run inline on the calling thread, so per-batch latency stays within noise of its $T{=}1$ value across the entire thread range, and the persistent pool absorbs the phases that do exceed the threshold without paying a spawn cost.
+The contrast with a naive parallelization is stark.
+Our first implementation spawned $T{-}1$ operating-system threads per phase; on the 185K-edge Gnutella workload its per-batch latency rose almost linearly with the thread count, from 0.53\,ms at $T{=}1$ to 2.7\,ms at $T{=}2$, 6.7\,ms at $T{=}8$, and 30.4\,ms at $T{=}32$---a 57$\times$ slowdown at 32 threads on work whose sequential cost is half a millisecond.
+With the persistent pool and adaptive dispatch, the same workload holds at 0.5--0.6\,ms per batch from $T{=}1$ through $T{=}256$.
+On the densest graphs, where insertion batches produce regions above 90K edges, the pool-dispatched recount phases engage at large $T$; their contribution is bounded by the sequential sweep that dominates end-to-end latency, so the whole-batch speedup over $T{=}1$ reaches XX$\times$ on \graphX and stays within 1.05$\times$ elsewhere.
 
 \begin{table}[tb]
-\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch).}
+\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs).}
 \label{tab:scaling}
 \begin{tabular}{lrrrr}
 \toprule
-Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & speedup \\
+Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & $T{=}256$ \\
 \midrule
-email-Enron & XX & XX & XX & XX$\times$ \\
-wiki-Vote & XX & XX & XX & XX$\times$ \\
-Enron & XX & XX & XX & XX$\times$ \\
-Amazon & XX & XX & XX & XX$\times$ \\
-YouTube & XX & XX & XX & XX$\times$ \\
-LiveJournal & XX & XX & XX & XX$\times$ \\
-Gnutella & XX & XX & XX & XX$\times$ \\
-skitter & XX & XX & XX & XX$\times$ \\
+email-Enron & XX & XX & XX & XX \\
+wiki-Vote & XX & XX & XX & XX \\
+Enron & XX & XX & XX & XX \\
+Amazon & XX & XX & XX & XX \\
+YouTube & XX & XX & XX & XX \\
+LiveJournal & XX & XX & XX & XX \\
+Gnutella & XX & XX & XX & XX \\
+skitter & XX & XX & XX & XX \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -133,20 +137,25 @@ skitter & XX & XX & XX & XX$\times$ & XX$\times$ \\
 
 \paragraph{Ablations (E7--E8)}
 \label{par:ablation}
-\Cref{tab:ablation} isolates two design decisions.
+\Cref{tab:ablation} isolates two design decisions on the $B{=}1000$, $p{=}0.5$ workload of each graph.
 \emph{Merging on/off}: disabling region merging forces one peel per seed; the gap quantifies \Cref{sec:method-peel}'s amortization.
 \emph{Precise vs.\ all-seeds}: seeding every enumerated edge rather than only support-changed ones inflates regions; the gap quantifies the seeding analysis.
 
 \begin{table}[tb]
-\caption{Ablation results (mean over five runs).}
+\caption{Ablations on the $B{=}1000$, $p{=}0.5$ workload at $T{=}32$: latency (ms/batch) and maximum region size, mean of five runs.}
 \label{tab:ablation}
-\begin{tabular}{lrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-Variant & ms/batch & region max & evaluations \\
+Graph & full & no-merge & all-seeds & full $R$ & no-merge $R$ & all-seeds $R$ \\
 \midrule
-Batch (full) & XX & XX & XX \\
-Batch, merging off & XX & XX & XX \\
-Batch, all-seeds & XX & XX & XX \\
+email-Enron & XX & XX & XX & XX & XX & XX \\
+wiki-Vote & XX & XX & XX & XX & XX & XX \\
+Enron & XX & XX & XX & XX & XX & XX \\
+Amazon & XX & XX & XX & XX & XX & XX \\
+YouTube & XX & XX & XX & XX & XX & XX \\
+LiveJournal & XX & XX & XX & XX & XX & XX \\
+Gnutella & XX & XX & XX & XX & XX & XX \\
+skitter & XX & XX & XX & XX & XX & XX \\
 \bottomrule
 \end{tabular}
 \end{table}

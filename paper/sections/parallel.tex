@@ -1,15 +1,23 @@
 \label{sec:parallel}
 
 \paragraph{Threading structure}
-The implementation is a single C++ program built around a persistent work-stealing thread pool of $T$ threads; the graph lives in a sorted-CSR structure with per-edge trussness and support arrays, and all phases run in shared memory.
-Per batch, the following phases are parallel:
+The implementation is a single C++ program built around a persistent phase-barrier thread pool of $T$ threads; the graph lives in a sorted-CSR structure with per-edge trussness and support arrays, and all phases run in shared memory.
+The pool is created once at index construction and dispatches one phase at a time: the calling thread publishes a work function and a task count, wakes the workers with a single condition-variable signal, joins the work itself, and spins on a completion counter, so a phase transition costs no thread creation.
+Per batch, the following phases are candidates for parallel dispatch:
 (i) witness enumeration, where each batch edge is an independent task whose triangle scan is a sorted-list intersection of the endpoints' adjacency lists;
 (ii) region closure, a parallel BFS in which region membership is a fetch-and-add mark and the frontier is split across threads;
 (iii) the recount, which assigns each region edge to a thread and writes per-edge support counts without synchronization;
-(iv) event collection, which merges the per-edge boundary scans into a deduplicated, bucket-sorted event list.
+(iv) event collection, whose boundary marking uses compare-and-swap so that each boundary edge is collected exactly once regardless of thread interleaving.
+Tasks are claimed in chunks of 64 by an atomic cursor, which keeps the counter on one cache line from becoming the bottleneck on phases with many small tasks.
+
+Dispatch is adaptive: a phase with fewer than a threshold of independent tasks runs inline on the calling thread.
+The threshold exists because per-phase coordination is not free even with a persistent pool: waking idle workers, migrating cache lines written by other threads, and the barrier itself cost microseconds per phase, which is negligible only when each task does enough work.
+We learned the price of getting this wrong twice.
+Our first implementation spawned $T{-}1$ fresh operating-system threads per phase; on a 185K-edge graph at $B{=}1000$ this made per-batch latency grow almost linearly in $T$, from 0.53\,ms at $T{=}1$ to 30.4\,ms at $T{=}32$, because thread creation and teardown dominated the actual work.
+Even after switching to the persistent pool, forcing every phase onto the pool degraded latency by 30--60\% on small-region workloads, because the sequential sweep then ran on cache lines dirtied by the recount's workers.
+Inline dispatch for small phases removed both effects: latency became thread-count invariant wherever the phases are small, and the pool engages exactly on the phases that are large enough to pay for it (on the densest graphs, insertion batches produce regions above 90K edges, and the pool handles their recount).
 The peeling sweep itself is sequential: it reproduces Wang and Cheng's~\cite{wang2012truss} pop order on the region, whose work is proportional to the region rather than the graph.
 We made this choice deliberately after measuring both variants: parallelizing the sweep with atomics reintroduced contention that cost more than the sweep's work saved, because the sweep's per-pop triangle scan is short once the region is small, and the sequential core leaves the shared arrays in a deterministic state that simplifies the differential testing harness.
-The phases that touch $O(|b|+|R|+\Delta)$ inputs---which dominate end-to-end batch latency on community graphs---are all parallel and scale with $T$.
 
 \paragraph{Memory and data structures}
 The edge-id map, adjacency, trussness, support, and per-batch scratch arrays are all preallocated once at load time and resized only when the closure reveals edges whose structures must grow.

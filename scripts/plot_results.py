@@ -30,10 +30,29 @@ def key_stats(vals):
 
 def load(resdir):
     rows = []
+    static_rows = []
     for path in sorted(glob.glob(os.path.join(resdir, "*.csv"))):
+        base = os.path.basename(path)
         with open(path) as f:
-            rows.extend(csv.DictReader(f))
-    return rows
+            if base.startswith(("static_", "build_")):
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("static graph") is False:
+                        continue
+                    parts = dict(p.split("=", 1) for p in line.split() if "=" in p)
+                    parts["graph"] = parts.get("graph", base.split("_")[1].split(".")[0])
+                    static_rows.append(parts)
+                continue
+            rd = csv.DictReader(f)
+            for r in rd:
+                if r.get("lat_mean_ms") in (None, "lat_mean_ms", ""):
+                    continue
+                try:
+                    float(r["lat_mean_ms"])
+                except (TypeError, ValueError):
+                    continue
+                rows.append(r)
+    return rows, static_rows
 
 
 def aggregate(rows):
@@ -69,21 +88,20 @@ def fmt_mean_std(st, field, nd=2, scale=1.0):
     return f"{v[0]*scale:.{nd}f}$\\pm${v[1]*scale:.{nd}f}"
 
 
-def emit_endtoend(agg, outdir, ref_b="1000", ref_p="0.5"):
-    lines = ["% E5: end-to-end at T=32, B=%s, p=%s" % (ref_b, ref_p)]
+def emit_endtoend(agg, outdir, static_by_g, ref_b="1000", ref_p="0.5"):
+    lines = ["% E5: end-to-end at T=32, B={}, p={}".format(ref_b, ref_p)]
     lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
     lines.append("Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\\\")
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
-        b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
-        p = agg.get((g, "peredge", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
-        s = agg.get((g, "static", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
-        if not any([b, p, s]):
+        b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32")) or agg.get((g, "batch", "full", f"{g}_s_b{ref_b}_p{ref_p}", "32"))
+        p = agg.get((g, "peredge", "full", f"{g}_b{ref_b}_p{ref_p}", "32")) or agg.get((g, "peredge", "-", f"{g}_s_b{ref_b}_p{ref_p}", "1")) or agg.get((g, "peredge", "full", f"{g}_s_b{ref_b}_p{ref_p}", "32"))
+        sms = static_by_g.get(g)
+        if not any([b, p, sms]):
             continue
         bms = b["ms"][0] if b and b["ms"] else None
         pms = p["ms"][0] if p and p["ms"] else None
-        sms = s["ms"][0] if s and s["ms"] else None
         r1 = f"{bms:.2f}" if bms else "--"
         r2 = f"{pms:.2f}" if pms else "--"
         r3 = f"{sms:.2f}" if sms else "--"
@@ -97,29 +115,52 @@ def emit_endtoend(agg, outdir, ref_b="1000", ref_p="0.5"):
 
 
 def emit_scaling(agg, outdir, ref_b="1000", ref_p="0.5"):
-    lines = ["% E4: thread scaling at B=%s p=%s" % (ref_b, ref_p)]
+    lines = ["% E4: thread scaling at B=" + ref_b + " p=" + ref_p]
     lines.append("\\begin{tabular}{lrrrr}")
     lines.append("\\toprule")
-    lines.append("Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & speedup \\\\")
+    lines.append("Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & $T{=}256$ \\\\")
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
         s = f"{g}_b{ref_b}_p{ref_p}"
-        t1 = agg.get((g, "batch", "full", s, "1"))
-        t8 = agg.get((g, "batch", "full", s, "8"))
-        t32 = agg.get((g, "batch", "full", s, "32"))
-        if not any([t1, t8, t32]):
+        cells = []
+        found = False
+        for t in ["1", "8", "32", "256"]:
+            st = agg.get((g, "batch", "full", s, t)) or agg.get((g, "batch", "full", s, str(int(t))))
+            ms = st["ms"][0] if st and st["ms"] else None
+            cells.append(f"{ms:.2f}" if ms else "--")
+            found = found or bool(ms)
+        if not found:
             continue
-        m1 = t1["ms"][0] if t1 and t1["ms"] else None
-        m8 = t8["ms"][0] if t8 and t8["ms"] else None
-        m32 = t32["ms"][0] if t32 and t32["ms"] else None
-        c1 = f"{m1:.2f}" if m1 else "--"
-        c8 = f"{m8:.2f}" if m8 else "--"
-        c32 = f"{m32:.2f}" if m32 else "--"
-        sp = f"{m1/m32:.1f}$\\times$" if m1 and m32 else "--"
-        lines.append(f"{g} & {c1} & {c8} & {c32} & {sp} \\\\")
+        lines.append(f"{g} & {' & '.join(cells)} \\\\")
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     with open(os.path.join(outdir, "tab_scaling.tex"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def emit_ablation(agg, outdir, ref_b="1000", ref_p="0.5"):
+    lines = ["% E7/E8: ablations at B=" + ref_b + " p=" + ref_p + " T=32"]
+    lines.append("\\begin{tabular}{lrrrrrr}")
+    lines.append("\\toprule")
+    lines.append("Graph & full & no-merge & all-seeds & full $R$ & no-merge $R$ & all-seeds $R$ \\\\")
+    lines.append("\\midrule")
+    for g in GRAPH_ORDER:
+        s = f"{g}_b{ref_b}_p{ref_p}"
+        row = []
+        found = False
+        for ab in ["full", "nomerge", "allseeds"]:
+            st = agg.get((g, "batch", ab, s, "32"))
+            ms = st["ms"][0] if st and st["ms"] else None
+            rm = st["region_max"] if st else None
+            row.append(f"{ms:.2f}" if ms else "--")
+            row.append(f"{int(rm)}" if rm else "--")
+            found = found or bool(ms)
+        if not found:
+            continue
+        lines.append(f"{g} & {' & '.join(row)} \\\\")
+    lines.append("\\bottomrule")
+    lines.append("\\end{tabular}")
+    with open(os.path.join(outdir, "tab_ablation.tex"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -147,12 +188,18 @@ def emit_regions(agg, outdir):
 
 def main(resdir, outdir):
     os.makedirs(outdir, exist_ok=True)
-    rows = load(resdir)
+    rows, static_rows = load(resdir)
     if not rows:
         print("no csv rows")
         return
     agg = aggregate(rows)
-    print(f"loaded {len(rows)} rows, {len(agg)} aggregates")
+    static_by_g = {}
+    for s in static_rows:
+        try:
+            static_by_g[s["graph"]] = float(s["time_s"]) * 1000.0
+        except (KeyError, ValueError):
+            pass
+    print(f"loaded {len(rows)} rows, {len(agg)} aggregates, {len(static_by_g)} static baselines")
     bad = [k for k, st in agg.items() if not st["verify_ok"]]
     if bad:
         print(f"VERIFY FAILURES: {len(bad)}")
@@ -175,9 +222,10 @@ def main(resdir, outdir):
                         st["region_max"] if st["region_max"] is not None else "",
                         f"{st['tp'][0]:.1f}" if st["tp"] else "",
                         int(st["verify_ok"])])
-    emit_endtoend(agg, outdir)
+    emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
     emit_regions(agg, outdir)
+    emit_ablation(agg, outdir)
     print(f"wrote tables to {outdir}")
 
 

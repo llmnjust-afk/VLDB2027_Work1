@@ -1,7 +1,16 @@
 #pragma once
 #include "fixpoint.h"
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <thread>
 #include <unordered_set>
+#include <cstdio>
+#include <chrono>
+#include <cstdlib>
+inline uint64_t now_ns() { return (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+inline int64_t bt_probe() { static int64_t v = getenv("BT_PROBE") ? 1 : -1; return v; }
 
 struct BatchStats {
   uint64_t evals = 0;
@@ -31,15 +40,96 @@ public:
   std::vector<uint8_t> in_next;
   std::vector<uint8_t> in_reg;
   std::vector<uint8_t> ub_in;
-  std::vector<uint8_t> dead_mark;
+  std::unique_ptr<std::atomic<uint8_t>[]> dead_mark;
   std::vector<uint32_t> psup;
   std::vector<uint8_t> palive;
   std::vector<std::vector<uint32_t>> evt_t;
   std::vector<uint32_t> ubc;
   std::vector<uint32_t> frontier, next, reg_list;
   std::vector<std::vector<uint32_t>> chg_e, nxt_t, seeds_t, dl;
+  std::vector<uint64_t> cnt_t;
   std::vector<std::vector<uint16_t>> chg_v;
   std::vector<std::vector<std::pair<uint32_t, uint32_t>>> mate_t;
+
+  std::vector<std::thread> pool_ths;
+  std::mutex pool_mx;
+  std::condition_variable pool_cv;
+  struct {
+    alignas(64) std::atomic<uint64_t> seq{0};
+    alignas(64) std::atomic<uint64_t> job{0};
+    alignas(64) std::atomic<uint64_t> done{0};
+    alignas(64) std::atomic<bool> stop{false};
+    alignas(64) std::atomic<uint64_t> count{0};
+  } P;
+  std::atomic<uint64_t>& pool_seq = P.seq;
+  std::atomic<uint64_t>& pool_job = P.job;
+  std::atomic<uint64_t>& pool_done = P.done;
+  std::atomic<bool>& pool_stop = P.stop;
+  std::atomic<uint64_t>& pool_count = P.count;
+  std::function<void(uint32_t, uint64_t)> pool_body = nullptr;
+
+  void pool_worker(uint32_t tid) {
+    uint64_t seen = 0;
+    for (;;) {
+      {
+        std::unique_lock<std::mutex> lk(pool_mx);
+        while (pool_seq.load(std::memory_order_acquire) == seen && !pool_stop.load())
+          pool_cv.wait(lk);
+      }
+      if (pool_stop.load()) return;
+      seen = pool_seq.load(std::memory_order_acquire);
+      uint64_t n = pool_count.load(std::memory_order_acquire);
+      for (;;) {
+        uint64_t i0 = pool_job.fetch_add(64);
+        if (i0 >= n) break;
+        uint64_t iend = i0 + 64;
+        if (iend > n) iend = n;
+        for (uint64_t i = i0; i < iend; ++i) pool_body(tid, i);
+      }
+      pool_done.fetch_add(1, std::memory_order_release);
+    }
+  }
+
+  void pool_start() {
+    for (uint32_t t = 1; t < T; ++t)
+      pool_ths.emplace_back([this, t] { pool_worker(t); });
+  }
+
+  void pool_shutdown() {
+    {
+      std::lock_guard<std::mutex> lk(pool_mx);
+      pool_stop.store(true, std::memory_order_release);
+      pool_cv.notify_all();
+    }
+    for (auto& t : pool_ths) if (t.joinable()) t.join();
+    pool_ths.clear();
+  }
+
+  template <class F>
+  void run_jobs(uint64_t count, F body) {
+    if (T <= 1 || count < 2 || count < 32768) {
+      for (uint64_t i = 0; i < count; ++i) body(0, i);
+      return;
+    }
+    pool_body = body;
+    {
+      std::lock_guard<std::mutex> lk(pool_mx);
+      pool_count.store(count, std::memory_order_release);
+      pool_job.store(0, std::memory_order_release);
+      pool_done.store(0, std::memory_order_relaxed);
+      pool_seq.fetch_add(1, std::memory_order_release);
+      pool_cv.notify_all();
+    }
+    for (;;) {
+      uint64_t i0 = pool_job.fetch_add(64);
+      if (i0 >= count) break;
+      uint64_t iend = i0 + 64;
+      if (iend > count) iend = count;
+      for (uint64_t i = i0; i < iend; ++i) body(0, i);
+    }
+    while (pool_done.load(std::memory_order_acquire) != T - 1)
+      std::this_thread::yield();
+  }
 
   BatchMaintainer(DynGraph& graph, uint32_t threads, uint64_t reserve_edges = 0)
       : g(graph), T(threads ? threads : 1) {
@@ -71,31 +161,16 @@ public:
     in_reg.assign(cap, 0);
     ub_in.assign(cap, 0);
     ubc.assign(cap, 0);
-    dead_mark.assign(cap, 0);
+    dead_mark = std::make_unique<std::atomic<uint8_t>[]>(cap);
+    for (uint32_t i = 0; i < cap; ++i) dead_mark[i].store(0, std::memory_order_relaxed);
     psup.assign(cap, 0);
     palive.assign(cap, 0);
     evt_t.resize(T);
+    cnt_t.resize(T);
+    pool_start();
   }
 
-  template <class F>
-  void run_jobs(uint64_t count, F body) {
-    if (T <= 1 || count < 2) {
-      for (uint64_t i = 0; i < count; ++i) body(0, i);
-      return;
-    }
-    std::vector<std::thread> ths;
-    std::atomic<uint64_t> job(0);
-    auto worker = [&](uint32_t tid) {
-      for (;;) {
-        uint64_t i = job.fetch_add(1);
-        if (i >= count) break;
-        body(tid, i);
-      }
-    };
-    for (uint32_t t = 1; t < T; ++t) ths.emplace_back(worker, t);
-    worker(0);
-    for (auto& t : ths) t.join();
-  }
+  ~BatchMaintainer() { pool_shutdown(); }
 
   inline void expand_local(uint32_t tid, uint32_t eid, std::vector<uint8_t>& flags,
                            std::vector<uint32_t>& out) {
@@ -177,30 +252,39 @@ public:
       fprintf(stderr, "[peel-in] region=%zu dup=%zu\n", reg_list.size(), (size_t)dup);
     }
     for (uint32_t t = 0; t < T; ++t) evt_t[t].clear();
+    uint64_t p0 = bt_probe() > 0 ? now_ns() : 0;
     run_jobs(reg_list.size(), [&](uint32_t tid, uint64_t i) {
       uint32_t eid = reg_list[i];
       uint32_t a = g.eu[eid], b = g.ev[eid];
-      st.evals++;
+      cnt_t[tid]++;
       uint32_t c = 0;
       g.common_neighbors(a, b, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
         ++c;
-        if (!in_reg[e1] && !dead_mark[e1]) {
-          dead_mark[e1] = 1;
-          evt_t[tid].push_back(e1);
+        if (!in_reg[e1] && !dead_mark[e1].load(std::memory_order_relaxed)) {
+          uint8_t exp = 0;
+          if (dead_mark[e1].compare_exchange_strong(exp, 1, std::memory_order_relaxed))
+            evt_t[tid].push_back(e1);
         }
-        if (!in_reg[e2] && !dead_mark[e2]) {
-          dead_mark[e2] = 1;
-          evt_t[tid].push_back(e2);
+        if (!in_reg[e2] && !dead_mark[e2].load(std::memory_order_relaxed)) {
+          uint8_t exp = 0;
+          if (dead_mark[e2].compare_exchange_strong(exp, 1, std::memory_order_relaxed))
+            evt_t[tid].push_back(e2);
         }
       });
       psup[eid] = c;
     });
+    uint64_t p1 = bt_probe() > 0 ? now_ns() : 0;
+    for (uint32_t t = 0; t < T; ++t) {
+      st.evals += cnt_t[t];
+      cnt_t[t] = 0;
+    }
     run_jobs(reg_list.size(), [&](uint32_t, uint64_t i) {
       uint32_t e = reg_list[i];
       sup[e].store(psup[e]);
       if (e == 3724 && BT_WATCH >= 0)
         fprintf(stderr, "[init3724] psup=%u tau=%u\n", psup[e], tau[e]);
     });
+    uint64_t p2 = bt_probe() > 0 ? now_ns() : 0;
     std::vector<std::pair<uint32_t, uint32_t>> evs;
     for (uint32_t t = 0; t < T; ++t)
       for (uint32_t e : evt_t[t]) evs.push_back({tau[e] >= 2 ? tau[e] - 2 : 0, e});
@@ -218,6 +302,7 @@ public:
     uint32_t maxsup = 0;
     for (uint32_t e : reg_list)
       if (psup[e] > maxsup) maxsup = psup[e];
+    uint64_t p3 = bt_probe() > 0 ? now_ns() : 0;
     std::vector<std::vector<uint32_t>> buckets(maxsup + 1);
     for (uint32_t e : reg_list) buckets[psup[e]].push_back(e);
     uint32_t popped = 0;
@@ -284,11 +369,16 @@ public:
       exit(1);
     }
     if (BT_WATCH >= 0) fprintf(stderr, "[peel-out] popped=%u\n", popped);
+    uint64_t p4 = bt_probe() > 0 ? now_ns() : 0;
+    if (bt_probe() > 0)
+      fprintf(stderr, "[probe] rec=%lu sup=%lu evs=%lu sweep=%lu total=%lu nreg=%zu T=%u\n",
+              (unsigned long)(p1-p0), (unsigned long)(p2-p1), (unsigned long)(p3-p2),
+              (unsigned long)(p4-p3), (unsigned long)(p4-p0), reg_list.size(), T);
     for (uint32_t e : reg_list) palive[e] = 0;
     for (auto& ev : evs) {
       palive[ev.second] = 0;
       ub_in[ev.second] = 0;
-      dead_mark[ev.second] = 0;
+      dead_mark[ev.second].store(0, std::memory_order_relaxed);
     }
   }
 
@@ -333,13 +423,14 @@ public:
 
   void phase_deletions(std::vector<uint32_t>& dels) {
     for (uint32_t t = 0; t < T; ++t) seeds_t[t].clear();
-    for (uint32_t e : dels) dead_mark[e] = 1;
+    for (uint32_t e : dels) dead_mark[e].store(1, std::memory_order_relaxed);
+    uint64_t w0 = bt_probe() > 0 ? now_ns() : 0;
     run_jobs(dels.size(), [&](uint32_t tid, uint64_t i) {
       uint32_t e = dels[i];
       if (!g.alive(e)) return;
       uint32_t u = g.eu[e], v = g.ev[e];
       g.common_neighbors(u, v, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-        if ((dead_mark[e1] && e1 < e) || (dead_mark[e2] && e2 < e)) return;
+        if ((dead_mark[e1].load(std::memory_order_relaxed) && e1 < e) || (dead_mark[e2].load(std::memory_order_relaxed) && e2 < e)) return;
         uint32_t o1 = sup[e1].fetch_sub(1);
         uint32_t o2 = sup[e2].fetch_sub(1);
         if (o1 == 0 || o2 == 0) {
@@ -355,19 +446,25 @@ public:
       }
     });
     if (BT_WATCH >= 0) fprintf(stderr, "[pd-enum-done]\n");
+    uint64_t w1 = bt_probe() > 0 ? now_ns() : 0;
     for (uint32_t e : dels) {
       if (!g.alive(e)) continue;
       g.remove_edge(e);
       tau[e] = 0;
       sup[e].store(0);
-      dead_mark[e] = 0;
+      dead_mark[e].store(0, std::memory_order_relaxed);
     }
     std::vector<uint32_t> seeds;
     for (uint32_t t = 0; t < T; ++t)
       for (uint32_t e : seeds_t[t]) seeds.push_back(e);
     reg_list.clear();
     region_closure(seeds, stats);
+    uint64_t w2 = bt_probe() > 0 ? now_ns() : 0;
     region_peel(stats);
+    uint64_t w3 = bt_probe() > 0 ? now_ns() : 0;
+    if (bt_probe() > 0)
+      fprintf(stderr, "[probeD] wit=%lu clos=%lu peel=%lu ndels=%zu\n",
+              (unsigned long)(w1-w0), (unsigned long)(w2-w1), (unsigned long)(w3-w2), dels.size());
     for (uint32_t e : reg_list) in_reg[e] = 0;
     reg_list.clear();
   }
@@ -406,6 +503,7 @@ public:
       mate_t[t].clear();
       dl[t].clear();
     }
+    uint64_t wi0 = bt_probe() > 0 ? now_ns() : 0;
     run_jobs(B, [&](uint32_t tid, uint64_t i) {
       uint32_t eid = neweids[i];
       uint32_t u = g.eu[eid], v = g.ev[eid];
@@ -432,6 +530,7 @@ public:
     reg_list.clear();
     std::vector<uint32_t> seeds;
     for (uint64_t i = 0; i < B; ++i) seeds.push_back(neweids[i]);
+    uint64_t wi1 = bt_probe() > 0 ? now_ns() : 0;
     run_jobs(M, [&](uint32_t tid, uint64_t i) {
       uint32_t f = allmates[i].first;
       if (dcount[f].load() > 0) dl[tid].push_back(f);
@@ -440,8 +539,13 @@ public:
     });
     for (uint32_t t = 0; t < T; ++t)
       for (uint32_t f : dl[t]) seeds.push_back(f);
+    uint64_t wi2 = bt_probe() > 0 ? now_ns() : 0;
     region_closure(seeds, stats);
     region_peel(stats);
+    uint64_t wi3 = bt_probe() > 0 ? now_ns() : 0;
+    if (bt_probe() > 0)
+      fprintf(stderr, "[probeI] clos=%lu peel=%lu wit=%lu nins=%zu\n",
+              (unsigned long)(wi2-wi1), (unsigned long)(wi3-wi2), (unsigned long)(wi1-wi0), ins.size());
     for (uint32_t e : reg_list) in_reg[e] = 0;
     reg_list.clear();
   }  void grow_structures(uint32_t eid) {
@@ -454,7 +558,8 @@ public:
     in_reg.resize(nsz, 0);
     ub_in.resize(nsz, 0);
     ubc.resize(nsz, 0);
-    dead_mark.resize(nsz, 0);
+    dead_mark = std::make_unique<std::atomic<uint8_t>[]>(nsz);
+    for (uint32_t i = 0; i < nsz; ++i) dead_mark[i].store(0, std::memory_order_relaxed);
     psup.resize(nsz, 0);
     palive.resize(nsz, 0);
     tau.resize(nsz, 0);

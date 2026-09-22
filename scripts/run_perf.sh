@@ -30,7 +30,7 @@ worker() {
       st=$S/${gname}_b${bs}_p${pi}.txt
       [ -s "$st" ] || continue
       grep -q ",${gname},${gname}_b${bs}_p${pi}," "$csv" 2>/dev/null && continue
-      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate full --runs 3 --dataset $gname >> "$csv" 2>/dev/null
+      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate full --runs 5 --dataset $gname >> "$csv" 2>/dev/null
       echo "[$gname] grid $(basename $st)"
     done
   done
@@ -41,19 +41,23 @@ worker() {
     touch "$ncsv"
     for t in $SCALE_THREADS; do
       grep -q ",${gname},${gname}_b1000_p0.5,$t," "$ncsv" 2>/dev/null && continue
-      $B batch --graph "$graph" --stream "$st" --threads $t --ablate full --runs 3 --dataset $gname >> "$ncsv" 2>/dev/null
+      $B batch --graph "$graph" --stream "$st" --threads $t --ablate full --runs 5 --dataset $gname >> "$ncsv" 2>/dev/null
       echo "[$gname] scale t$t"
     done
     # ablation nomerge at T=32 (last run dumps the final graph for the static baseline)
     nmcsv=$OUT/nomerge_${gname}_t32.csv; touch "$nmcsv"
     final=/data/lab/final_${gname}.txt
     grep -q ",${gname},${gname}_b1000_p0.5," "$nmcsv" 2>/dev/null || \
-      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs 3 --dataset $gname --graph-out "$final" >> "$nmcsv" 2>/dev/null
+      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs 5 --dataset $gname --graph-out "$final" >> "$nmcsv" 2>/dev/null
     # static recompute baseline on the FINAL graph of the b1000_p0.5 stream
     scsv=$OUT/static_${gname}.csv; touch "$scsv"
     grep -q "static" "$scsv" 2>/dev/null || \
       $B static --graph "$final" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
-    echo "[$gname] nomerge+static b1000"
+    # ablation allseeds at T=32 on the b1000_p0.5 workload
+    ascsv=$OUT/allseeds_${gname}_t32.csv; touch "$ascsv"
+    grep -q ",${gname},${gname}_b1000_p0.5," "$ascsv" 2>/dev/null || \
+      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate allseeds --runs 5 --dataset $gname >> "$ascsv" 2>/dev/null
+    echo "[$gname] nomerge+static+allseeds b1000"
   fi
   # per-edge baseline on small graphs (reduced stream)
   case $gname in
