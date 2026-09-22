@@ -1,0 +1,13 @@
+Input graph directory: ./
+Dynamic graphs: dblp_insertion_edges
+Output directory:
+Benchmarks: PLDS, EKCore, AKCore, LDS
+Numbers of workers: 60
+Deltas: 0.4
+Lambdas: 3
+Batch sizes: 1000000
+Output stats: False
+Output sizes: False
+Initial Graph File:
+Number of Levels Divisor: 50
+Opt: False
