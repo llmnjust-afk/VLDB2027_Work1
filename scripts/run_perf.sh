@@ -44,14 +44,15 @@ worker() {
       $B batch --graph "$graph" --stream "$st" --threads $t --ablate full --runs 3 --dataset $gname >> "$ncsv" 2>/dev/null
       echo "[$gname] scale t$t"
     done
-    # ablation nomerge at T=32
+    # ablation nomerge at T=32 (last run dumps the final graph for the static baseline)
     nmcsv=$OUT/nomerge_${gname}_t32.csv; touch "$nmcsv"
+    final=/data/lab/final_${gname}.txt
     grep -q ",${gname},${gname}_b1000_p0.5," "$nmcsv" 2>/dev/null || \
-      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs 3 --dataset $gname >> "$nmcsv" 2>/dev/null
-    # static recompute on same stream
+      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs 3 --dataset $gname --graph-out "$final" >> "$nmcsv" 2>/dev/null
+    # static recompute baseline on the FINAL graph of the b1000_p0.5 stream
     scsv=$OUT/static_${gname}.csv; touch "$scsv"
-    grep -q ",${gname},${gname}_b1000_p0.5," "$scsv" 2>/dev/null || \
-      $B static --graph "$graph" --stream "$st" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
+    grep -q "static" "$scsv" 2>/dev/null || \
+      $B static --graph "$final" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
     echo "[$gname] nomerge+static b1000"
   fi
   # per-edge baseline on small graphs (reduced stream)
@@ -69,8 +70,8 @@ worker() {
   # build-only (empty stream)
   : > /tmp/empty_stream.txt
   ecsv=$OUT/build_${gname}.csv; touch "$ecsv"
-  grep -q "empty," "$ecsv" 2>/dev/null || \
-    $B static --graph "$graph" --stream /tmp/empty_stream.txt --threads 32 --dataset $gname >> "$ecsv" 2>/dev/null
+  grep -q "static" "$ecsv" 2>/dev/null || \
+    $B static --graph "$graph" --threads 32 --dataset $gname >> "$ecsv" 2>/dev/null
   echo "[$gname] build done"
 }
 

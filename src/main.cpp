@@ -7,6 +7,8 @@
 static std::string g_dataset = "NA";
 
 static std::string g_stream_name = "NA";
+static std::string g_graph_out = "";
+static uint32_t g_runs_total = 1;
 
 static void csv_header() {
   printf("dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,"
@@ -89,6 +91,10 @@ static void run_batch(DynGraph& g, const std::vector<std::vector<Op>>& stream, u
   }
   double maint = now_s() - t1;
   ok = verify_now(g, bm.tau, vs) && ok;
+  {
+    std::string go = g_graph_out;
+    if (!go.empty() && run_id + 1 == g_runs_total) save_graph_edgelist(g, go);
+  }
   BatchStats* st = &bm.stats;
   uint32_t obs_bs = stream.empty() || stream[0].empty() ? 0 : (uint32_t)stream[0].size();
   csv_row("batch", threads, ablate, obs_bs, (uint32_t)stream.size(), run_id, build_s, maint, lats,
@@ -286,9 +292,12 @@ int main(int argc, char** argv) {
       }
       if (cmd == "peredge")
         run_peredge(g, stream, r, check_every);
-      else
+      else {
+        g_graph_out = arg_s(a, "--graph-out", "");
+        g_runs_total = runs;
         run_batch(g, stream, arg_u32(a, "--threads", 1), arg_s(a, "--ablate", "full"), r,
                   check_every);
+      }
     }
     return 0;
   }
