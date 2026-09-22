@@ -184,12 +184,12 @@
 
 
 \bibitem[\protect\citeauthoryear{Couto and Fernandes}{Couto and
-  Fernandes}{2025}]%
+  Fernandes}{2026}]%
         {couto2025hardness}
 \bibfield{author}{\bibinfo{person}{Yan~S. Couto} {and}
-  \bibinfo{person}{Cristina~G. Fernandes}.} \bibinfo{year}{2025}\natexlab{}.
+  \bibinfo{person}{Cristina~G. Fernandes}.} \bibinfo{year}{2026}\natexlab{}.
 \newblock \showarticletitle{Hardness of Dynamic Core and Truss Decompositions}.
-  In \bibinfo{booktitle}{\emph{Approximation and Online Algorithms}}.
+  In \bibinfo{booktitle}{\emph{Lecture Notes in Computer Science}}.
   \bibinfo{publisher}{Springer Nature Switzerland}, \bibinfo{pages}{64--80}.
 \newblock
 \urldef\tempurl%
@@ -283,29 +283,28 @@
         {jakkula2019streaming}
 \bibfield{author}{\bibinfo{person}{Venkata~Rohit Jakkula} {and}
   \bibinfo{person}{George Karypis}.} \bibinfo{year}{2019}\natexlab{}.
-\newblock \bibinfo{title}{Streaming and Batch Algorithms for Truss
-  Decomposition}.
-\newblock \bibinfo{howpublished}{arXiv:1908.10550}.
+\newblock \showarticletitle{Streaming and Batch Algorithms for Truss
+  Decomposition}. In \bibinfo{booktitle}{\emph{2019 First International
+  Conference on Graph Computing (GC)}}. \bibinfo{publisher}{IEEE},
+  \bibinfo{pages}{51--59}.
 \newblock
-\showeprint[arxiv]{1908.10550}
 \urldef\tempurl%
-\url{http://arxiv.org/abs/1908.10550v1}
-\showURL{%
-\tempurl}
+\url{https://doi.org/10.1109/gc46384.2019.00016}
+\showDOI{\tempurl}
 
 
 \bibitem[\protect\citeauthoryear{Kabir and Madduri}{Kabir and Madduri}{2017}]%
         {kabir2017sharedmemory}
 \bibfield{author}{\bibinfo{person}{Humayun Kabir} {and} \bibinfo{person}{Kamesh
   Madduri}.} \bibinfo{year}{2017}\natexlab{}.
-\newblock \bibinfo{title}{Shared-memory Graph Truss Decomposition}.
-\newblock \bibinfo{howpublished}{arXiv:1707.02000}.
+\newblock \showarticletitle{Shared-Memory Graph Truss Decomposition}. In
+  \bibinfo{booktitle}{\emph{2017 IEEE 24th International Conference on High
+  Performance Computing (HiPC)}}. \bibinfo{publisher}{IEEE},
+  \bibinfo{pages}{13--22}.
 \newblock
-\showeprint[arxiv]{1707.02000}
 \urldef\tempurl%
-\url{http://arxiv.org/abs/1707.02000v1}
-\showURL{%
-\tempurl}
+\url{https://doi.org/10.1109/hipc.2017.00012}
+\showDOI{\tempurl}
 
 
 \bibitem[\protect\citeauthoryear{Lanciano, Miyauchi, Fazzone, and
@@ -349,10 +348,14 @@
   \bibinfo{year}{2024}\natexlab{}.
 \newblock \showarticletitle{Parallel k-Core Decomposition with Batched Updates
   and Asynchronous Reads}.
-\newblock \bibinfo{howpublished}{arXiv:2409.19935}.
+\newblock \bibinfo{howpublished}{arXiv:2401.08015}.
 \newblock  (\bibinfo{year}{2024}).
 \newblock
-\showeprint[arxiv]{2409.19935}
+\showeprint[arxiv]{2401.08015}
+\urldef\tempurl%
+\url{http://arxiv.org/abs/2401.08015v1}
+\showURL{%
+\tempurl}
 
 
 \bibitem[\protect\citeauthoryear{Liu, Dong, Gu, and Sun}{Liu
@@ -565,8 +568,8 @@
 \bibitem[\protect\citeauthoryear{Zhou, Liu, Yu, Liang, and Zhang}{Zhou
   et~al\mbox{.}}{2014}]%
         {zhou2014efficient}
-\bibfield{author}{\bibinfo{person}{Rui~Hong Zhou}, \bibinfo{person}{Chengfei
-  Liu}, \bibinfo{person}{Jeffrey~Xu Yu}, \bibinfo{person}{Weifa Liang}, {and}
+\bibfield{author}{\bibinfo{person}{Rui Zhou}, \bibinfo{person}{Chengfei Liu},
+  \bibinfo{person}{Jeffrey~Xu Yu}, \bibinfo{person}{Weifa Liang}, {and}
   \bibinfo{person}{Yanchun Zhang}.} \bibinfo{year}{2014}\natexlab{}.
 \newblock \showarticletitle{Efficient Truss Maintenance in Evolving Networks}.
 \newblock \bibinfo{howpublished}{arXiv:1402.2807}.

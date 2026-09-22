@@ -1,0 +1,9 @@
+% E2: batch vs no-merge vs per-edge at B=1000 p=0.5 T=32 (peredge scaled to batch-equivalent)
+\begin{tabular}{lrrrrr}
+\toprule
+Graph & Batch & No-merge & PerEdge & evals (N/B) & evals (P/B) \\
+\midrule
+amazon & 39.33 & 52.56 & -- & 1.50$\times$ & -- \\
+gnutella & 0.53 & 0.88 & 380.90 & 1.00$\times$ & 484.4$\times$ \\
+\bottomrule
+\end{tabular}

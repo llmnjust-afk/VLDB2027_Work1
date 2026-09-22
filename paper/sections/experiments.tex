@@ -18,42 +18,28 @@ Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, reg
 
 \paragraph{Correctness under adversarial streams (E1)}
 \label{par:correctness}
-We validate exactness on three workload families: controlled random graphs (hundreds to thousands of edges, thousands of mixed batches, checked after every batch), adversarial streams with planted cliques and star topologies, and the eight real graphs (checked at checkpoints).
-The maintained decomposition matched the oracle after every batch on all workloads; we also verified that the number of edges whose maintained value differs from a previous checkpoint equals the true change set.
+We validate exactness on two workload families.
+The first is a matrix of two controlled random graphs---one with a single dense community, one with community structure---streamed as 24 update streams of 40 mixed batches each and executed under all three code paths of \Cref{tab:singlepass} at four threads, with the maintained decomposition compared against a from-scratch static peeling after every batch on the smallest streams, every 25th batch on the hundred-edge streams, every 50th batch on the thousand-edge streams, and at the end of every stream.
+The second family is the eight real graphs, each streamed at 200K updates and compared in full against the oracle at stream end.
+The maintained decomposition matched the oracle on every check on every workload; the matrix also exercises adversarial shapes indirectly, since the streams contain whole-stream deletion phases ($p{=}0$), whole-stream insertion phases ($p{=}1$), balanced mixes, and re-insertions of previously deleted edges.
 \Cref{tab:correctness} summarizes the counts.
 
 \begin{table}[tb]
 \caption{Differential-testing summary (maintained vs.\ static oracle).}
 \label{tab:correctness}
-\begin{tabular}{lrrr}
-\toprule
-Workload family & batches & checked edges & max error \\
-\midrule
-Controlled random ($n\le 10^3$) & $24\times 200$ & all, per batch & 0 \\
-Adversarial (planted cliques) & $12\times 500$ & all, per batch & 0 \\
-Real graphs (checkpoint) & $8\times 200$K & sampled & 0 \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_correctness}
 \end{table}
 
 \paragraph{Single-pass behavior (E2)}
 \label{par:singlepass}
-\Cref{tab:singlepass} contrasts the three code paths on a fixed workload grid: batch, batch with merging disabled (each seed peeled separately), and per-edge.
-The merging and single-pass columns show that a $B$-fold batch reduces the number of region peelings by up to a factor of $B$, and that evaluations collapse correspondingly.
+\Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline scaled to a batch-equivalent workload.
+Disabling merging costs XX--XX\% more per batch and up to XX$\times$ more support evaluations, because every seed triggers its own closure and peeling instead of sharing a single pass.
+The per-edge baseline is slower by two to three orders of magnitude on every graph where it is tractable to run.
 
 \begin{table}[tb]
-\caption{Per-batch cost decomposition (mean over the workload grid; five runs).}
+\caption{Batch, no-merge, and per-edge costs at $B{=}1000$, $p{=}0.5$ (ms/batch; per-edge scaled to a batch-equivalent; $T{=}32$, mean of five runs).}
 \label{tab:singlepass}
-\begin{tabular}{lrrrrr}
-\toprule
-Method & ms/batch & evaluations & peels/batch & region max & events max \\
-\midrule
-Batch   & XX & XX & XX & XX & XX \\
-No-merge & XX & XX & XX & XX & XX \\
-PerEdge & XX & XX & XX & -- & -- \\
-Static  & XX & XX & -- & -- & -- \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_singlepass}
 \end{table}
 
 \paragraph{Region sizes (E3)}
@@ -65,20 +51,7 @@ The event-to-region ratio stays below XX on all but the single-community graphs,
 \begin{table}[tb]
 \caption{Region-size profile (mean and maximum region size per graph).}
 \label{tab:regions}
-\begin{tabular}{lrrrrr}
-\toprule
-Graph & $R/B{=}1$ & $R/B{=}10$ & $R/B{=}100$ & $R/B{=}1000$ & $R/B{=}10^4$ \\
-\midrule
-email-Enron & XX & XX & XX & XX & XX \\
-wiki-Vote & XX & XX & XX & XX & XX \\
-Enron & XX & XX & XX & XX & XX \\
-Amazon & XX & XX & XX & XX & XX \\
-YouTube & XX & XX & XX & XX & XX \\
-LiveJournal & XX & XX & XX & XX & XX \\
-Gnutella & XX & XX & XX & XX & XX \\
-skitter & XX & XX & XX & XX & XX \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_regions}
 \end{table}
 
 \paragraph{Scaling (E4)}
@@ -93,20 +66,7 @@ On the densest graphs, where insertion batches produce regions above 90K edges, 
 \begin{table}[tb]
 \caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs).}
 \label{tab:scaling}
-\begin{tabular}{lrrrr}
-\toprule
-Graph & $T{=}1$ & $T{=}8$ & $T{=}32$ & $T{=}256$ \\
-\midrule
-email-Enron & XX & XX & XX & XX \\
-wiki-Vote & XX & XX & XX & XX \\
-Enron & XX & XX & XX & XX \\
-Amazon & XX & XX & XX & XX \\
-YouTube & XX & XX & XX & XX \\
-LiveJournal & XX & XX & XX & XX \\
-Gnutella & XX & XX & XX & XX \\
-skitter & XX & XX & XX & XX \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_scaling}
 \end{table}
 
 \paragraph{End-to-end comparison (E5--E6)}
@@ -119,20 +79,7 @@ The batch algorithm sits between the two, approaching the static cost as $B$ gro
 \begin{table}[tb]
 \caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std).}
 \label{tab:endtoend}
-\begin{tabular}{lrrrrr}
-\toprule
-Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\
-\midrule
-email-Enron & XX & XX & XX & XX$\times$ & XX$\times$ \\
-wiki-Vote & XX & XX & XX & XX$\times$ & XX$\times$ \\
-Enron & XX & XX & XX & XX$\times$ & XX$\times$ \\
-Amazon & XX & XX & XX & XX$\times$ & XX$\times$ \\
-YouTube & XX & XX & XX & XX$\times$ & XX$\times$ \\
-LiveJournal & XX & XX & XX & XX$\times$ & XX$\times$ \\
-Gnutella & XX & XX & XX & XX$\times$ & XX$\times$ \\
-skitter & XX & XX & XX & XX$\times$ & XX$\times$ \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_endtoend}
 \end{table}
 
 \paragraph{Ablations (E7--E8)}
@@ -144,20 +91,7 @@ skitter & XX & XX & XX & XX$\times$ & XX$\times$ \\
 \begin{table}[tb]
 \caption{Ablations on the $B{=}1000$, $p{=}0.5$ workload at $T{=}32$: latency (ms/batch) and maximum region size, mean of five runs.}
 \label{tab:ablation}
-\begin{tabular}{lrrrrrr}
-\toprule
-Graph & full & no-merge & all-seeds & full $R$ & no-merge $R$ & all-seeds $R$ \\
-\midrule
-email-Enron & XX & XX & XX & XX & XX & XX \\
-wiki-Vote & XX & XX & XX & XX & XX & XX \\
-Enron & XX & XX & XX & XX & XX & XX \\
-Amazon & XX & XX & XX & XX & XX & XX \\
-YouTube & XX & XX & XX & XX & XX & XX \\
-LiveJournal & XX & XX & XX & XX & XX & XX \\
-Gnutella & XX & XX & XX & XX & XX & XX \\
-skitter & XX & XX & XX & XX & XX & XX \\
-\bottomrule
-\end{tabular}
+\input{tables/tab_ablation}
 \end{table}
 
 \paragraph{Discussion}
