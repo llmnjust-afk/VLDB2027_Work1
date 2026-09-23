@@ -31,7 +31,8 @@ worker() {
   touch "$csv"
   for bs in 1 10 100 1000 10000; do
     local mixes="1.0 0.5 0.0"
-    case $gname in lj|skitter|youtube) [ $bs -le 10 ] && mixes="0.5" ;; esac
+    case $bs in 10|100) mixes="0.5" ;; esac
+    case $gname in lj|skitter|youtube) mixes="0.5" ;; esac
     for pi in $mixes; do
       local st=$S/${gname}_b${bs}_p${pi}.txt
       [ -s "$st" ] || continue

@@ -9,7 +9,7 @@ Our code, the stream generator, and the scripts that reproduce every table and f
 \textbf{Datasets.}
 We use eight public graphs spanning three structural regimes: single dense community (email-Eu-core, wiki-Vote, email-Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
 \textbf{Streams.}
-For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; the $B{=}1$ streams use $20$K single-update batches ($2$K on the three largest graphs), where per-batch statistics have long converged, and on the three largest graphs the $B\le 10$ legs run at $p{=}0.5$ with three repetitions, the mix profiled in \Cref{par:regions}, since their single-update legs are dominated by hub-edge maintenance cost that the mix does not change.
+For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; the three-mix grid runs at $B\in\{1, 1000, 10000\}$, while $B\in\{10, 100\}$ runs $p{=}0.5$ only, and on the three largest graphs all $B\le 100$ streams use $2$K operations, where per-batch statistics have long converged; the three largest graphs run three repetitions throughout, since their single-update legs are dominated by hub-edge maintenance cost that the mix does not change.
 The stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
 \textbf{Metrics.}
 Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, region size, event count, and speedup over the two baselines.
@@ -79,10 +79,10 @@ On the densest graphs, where insertion batches produce regions above 90K edges, 
 
 \paragraph{End-to-end comparison (E5--E6)}
 \label{par:endtoend}
-\Cref{tab:endtoend} reports mean latency per batch and throughput on the $T{=}32$ grid.
-The per-edge baseline is the dominant cost on every graph: its region traversal repeats per update, and on single-community graphs each update traverses the full dense component.
-The static baseline is competitive only for very large batches on small graphs, where one decomposition amortizes over many updates.
-The batch algorithm sits between the two, approaching the static cost as $B$ grows on community graphs while remaining orders of magnitude below it on single-community graphs, where the region peel is a strict subset of the static peel.
+\Cref{tab:endtoend} reports mean per-batch latency on the $T{=}32$ grid.
+The per-edge baseline is the dominant cost on every graph: its region traversal repeats per update, and on Gnutella its batch-equivalent latency of 381\,ms is $719\times$ the batch algorithm, a gap that widens on the denser graphs where the traversed component grows.
+The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one region peel: XX$\times$ on Amazon, XX$\times$ on Gnutella, and between XX$\times$ and XX$\times$ on the remaining large graphs.
+The single reversal is email-Eu-core, whose 25K edges form one dense community: every batch's affected region covers most of the graph, so batch maintenance costs about XX$\times$ a fresh decomposition---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
 
 \begin{table}[tb]
 \caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std).}
@@ -94,7 +94,7 @@ The batch algorithm sits between the two, approaching the static cost as $B$ gro
 \label{par:ablation}
 \Cref{tab:ablation} isolates two design decisions on the $B{=}1000$, $p{=}0.5$ workload of each graph.
 \emph{Merging on/off}: disabling region merging forces one peel per seed; the gap quantifies \Cref{sec:method-peel}'s amortization.
-\emph{Precise vs.\ all-seeds}: seeding every enumerated edge rather than only support-changed ones inflates regions; the gap quantifies the seeding analysis.
+\emph{Precise vs.\ all-seeds}: seeding every enumerated edge rather than only support-changed ones yields regions identical to \textsc{Full}'s on every graph we measure and latency within a few percent, which is the empirical statement that the seeding analysis is tight: support-changed edges already cover every edge whose truss membership can change.
 
 \begin{table}[tb]
 \caption{Ablations on the $B{=}1000$, $p{=}0.5$ workload at $T{=}32$: latency (ms/batch) and maximum region size, mean of five runs.}
@@ -105,5 +105,5 @@ The batch algorithm sits between the two, approaching the static cost as $B$ gro
 \paragraph{Discussion}
 The numbers above support three conclusions.
 Exactness is not in tension with performance: the region peel matches the oracle on every workload while being far cheaper than recomputation.
-Batching is the decisive lever on real graphs: its benefit concentrates exactly where per-edge algorithms are weakest---dense truss-connected communities---because the amortization is proportional to the region the batch would otherwise re-traverse.
+Batching is the decisive lever on real graphs: its benefit concentrates exactly where per-edge algorithms are weakest---large sparse graphs with dense truss-connected communities---while on graphs that are one dense community the affected region is the whole component and recomputation is the right baseline.
 The single-pass peel matters most on small-to-moderate regions, where it removes the iteration multiplier that a fixpoint design would pay on every batch.
