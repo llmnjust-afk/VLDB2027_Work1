@@ -1,5 +1,5 @@
 Dense-subgraph analytics on graphs is now a routine component of data-management systems, and among the cohesive-subgraph models in production use the $k$-truss occupies a middle ground between the component-oriented $k$-core and the clique: an edge of trussness~$k$ lies in at least $k-2$ triangles whose remaining edges are at least as cohesive.
-The model was introduced by Cohen~\cite{cohen2019trusses}, and today the trussness of every edge underlies community detection~\cite{conte2020truly}, truss-based community search~\cite{huang2016attribute,behrouz2022firmtruss}, graph similarity~\cite{zheng2023trussbased}, and temporal cohesive-subgraph analytics~\cite{lotito2020efficient,saryce2025powerful}.
+The model was introduced by Cohen~\cite{cohen2019trusses}, and today the trussness of every edge underlies community detection~\cite{conte2020truly}, truss-based community search~\cite{huang2016attribute,behrouz2022firmtruss}, attributed community search~\cite{fang2026place}, graph similarity~\cite{zheng2023trussbased}, and temporal cohesive-subgraph analytics~\cite{lotito2020efficient,saryce2025powerful}.
 Because the trussness values are recomputed from scratch in $O(\sum_e \tau_e)$ work by bucket peeling, these applications traditionally materialize the decomposition once and reuse it.
 
 The data graphs of the target applications are not static.
