@@ -90,7 +90,6 @@ inline StaticTruss static_truss(const DynGraph& g, uint32_t nthreads = 1,
       if (!alive[eid] || sup[eid] != s) continue;
       out.tau[eid] = (uint16_t)(s + 2);
       alive[eid] = 0;
-      if (BT_WATCH >= 0) fprintf(stderr, "[spop] s=%u eid=%u sup=%u\n", s, eid, sup[eid]);
       uint32_t u = g.eu[eid], v = g.ev[eid];
       st.next_epoch();
       for (auto& r : g.adj[u]) st.mark(r.nbr, r.eid);

@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 
-inline int64_t BT_WATCH = -1;
 
 inline double now_s() {
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();

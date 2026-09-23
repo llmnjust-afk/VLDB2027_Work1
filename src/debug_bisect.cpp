@@ -37,13 +37,13 @@ int main(int argc, char** argv) {
     bm = new BatchMaintainer(g, nthreads, reserve);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
-      if (we >= 0) { bm->watch_eid = we; BT_WATCH = we; }
+      if (we >= 0) { bm->watch_eid = we; }
     }
   } else {
     pm = new PerEdgeMaintainer(g);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
-      if (we >= 0) { WATCH_EID = we; BT_WATCH = we; }
+      if (we >= 0) { WATCH_EID = we; }
       fprintf(stderr, "[trace] watch eid=%lld\n", we);
     }
   }
