@@ -36,8 +36,10 @@ worker() {
     for pi in $mixes; do
       local st=$S/${gname}_b${bs}_p${pi}.txt
       [ -s "$st" ] || continue
+      local extra=""
+      [ $bs -eq 1000 ] && [ "$pi" = "0.5" ] && extra="--graph-out /data/lab/final_${gname}.txt"
       [ "$(grep -c "${gname},batch,32,full,${gname}_b${bs}_p${pi}," "$csv" 2>/dev/null)" -ge "$RUNS" ] && continue
-      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate full --runs $RUNS --dataset $gname >> "$csv" 2>/dev/null
+      $B batch --graph "$graph" --stream "$st" --threads 32 --ablate full --runs $RUNS --dataset $gname $extra >> "$csv" 2>/dev/null
       echo "[$gname] grid $(basename $st)"
     done
   done
@@ -51,6 +53,15 @@ worker() {
   # thread scaling on b1000_p0.5
   local st=$S/${gname}_b1000_p0.5.txt
   if [ -s "$st" ]; then
+    local final=/data/lab/final_${gname}.txt
+    local scsv=$OUT/static_${gname}.csv; touch "$scsv"
+    case $gname in
+      lj|skitter|youtube)
+        # giants: static baseline only (scale/nomerge/allseeds legs are out of budget)
+        grep -q "static" "$scsv" 2>/dev/null || \
+          $B static --graph "$final" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
+        echo "[$gname] static b1000" ;;
+      *)
     local ncsv=$OUT/batch_${gname}_scale.csv
     touch "$ncsv"
     for t in $SCALE_THREADS; do
@@ -60,11 +71,9 @@ worker() {
     done
     # ablation nomerge at T=32 (last run dumps the final graph for the static baseline)
     local nmcsv=$OUT/nomerge_${gname}_t32.csv; touch "$nmcsv"
-    local final=/data/lab/final_${gname}.txt
     [ "$(grep -c "${gname},batch,32,nomerge,${gname}_b1000_p0.5," "$nmcsv" 2>/dev/null)" -ge "$RUNS" ] || \
       $B batch --graph "$graph" --stream "$st" --threads 32 --ablate nomerge --runs $RUNS --dataset $gname --graph-out "$final" >> "$nmcsv" 2>/dev/null
     # static recompute baseline on the FINAL graph of the b1000_p0.5 stream
-    local scsv=$OUT/static_${gname}.csv; touch "$scsv"
     grep -q "static" "$scsv" 2>/dev/null || \
       $B static --graph "$final" --threads 32 --dataset $gname >> "$scsv" 2>/dev/null
     # ablation allseeds at T=32 on the b1000_p0.5 workload
@@ -72,6 +81,8 @@ worker() {
     [ "$(grep -c "${gname},batch,32,allseeds,${gname}_b1000_p0.5," "$ascsv" 2>/dev/null)" -ge "$RUNS" ] || \
       $B batch --graph "$graph" --stream "$st" --threads 32 --ablate allseeds --runs $RUNS --dataset $gname >> "$ascsv" 2>/dev/null
     echo "[$gname] nomerge+static+allseeds b1000"
+        ;;
+    esac
   fi
   # per-edge baseline on small graphs (reduced stream)
   case $gname in

@@ -64,7 +64,7 @@ The event-to-region ratio stays below XX on all but the single-community graphs,
 
 \paragraph{Scaling (E4)}
 \label{par:scaling}
-We evaluate thread scaling on the $B{=}1000$, $p{=}0.5$ workload of each graph, sweeping the thread count and reporting $T\in\{1,8,32,256\}$ (\Cref{tab:scaling}).
+We evaluate thread scaling on the $B{=}1000$, $p{=}0.5$ workload of each graph, sweeping $T\in\{1,8,32,256\}$ on the five graphs where the full sweep is affordable and reporting the $T{=}32$ operating point of the three largest graphs (\Cref{tab:scaling}).
 The design goal is not speedup but the absence of pathological degradation: with adaptive dispatch, phases whose task counts fall below the dispatch threshold run inline on the calling thread, so per-batch latency stays within noise of its $T{=}1$ value across the entire thread range, and the persistent pool absorbs the phases that do exceed the threshold without paying a spawn cost.
 The contrast with a naive parallelization is stark.
 Our first implementation spawned $T{-}1$ operating-system threads per phase; on the 147K-edge Gnutella workload its per-batch latency rose almost linearly with the thread count, from 0.53\,ms at $T{=}1$ to 2.7\,ms at $T{=}2$, 6.7\,ms at $T{=}8$, and 30.4\,ms at $T{=}32$---a 57$\times$ slowdown at 32 threads on work whose sequential cost is half a millisecond.
