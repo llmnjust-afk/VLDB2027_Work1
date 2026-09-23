@@ -93,19 +93,29 @@ def fmt_mean_std(st, field, nd=2, scale=1.0):
 
 
 def emit_endtoend(agg, outdir, static_by_g, ref_b="1000", ref_p="0.5"):
-    lines = ["% E5: end-to-end at T=32, B={}, p={}".format(ref_b, ref_p)]
+    import re
+    lines = ["% E5: end-to-end at T=32, B={}, p={} (per-edge: per-op cost from the B=1 stream, charged x B)".format(ref_b, ref_p)]
     lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
     lines.append("Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\\\")
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
         b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
-        p = agg.get((g, "peredge", "-", f"{g}_b{ref_b}_p{ref_p}", "1")) or agg.get((g, "peredge", "-", f"{g}_s_b{ref_b}_p{ref_p}", "1"))
+        pst = None
+        for st in (f"{g}_b1_p{ref_p}", f"{g}_b{ref_b}_p{ref_p}", f"{g}_s_b{ref_b}_p{ref_p}"):
+            p = agg.get((g, "peredge", "-", st, "1"))
+            if p:
+                pst = st
+                break
         sms = static_by_g.get(g)
         if not any([b, p, sms]):
             continue
         bms = b["ms"][0] if b and b["ms"] else None
-        pms = p["ms"][0] if (p and p["ms"]) else None
+        pms = None
+        if p and p["ms"] and pst:
+            mm = re.match(r".*_b(\d+)_p", pst)
+            pbsz = float(mm.group(1)) if mm else 1.0
+            pms = p["ms"][0] / pbsz * float(ref_b)
         r1 = f"{bms:.2f}" if bms else "--"
         r2 = f"{pms:.2f}" if pms else "--"
         r3 = f"{sms:.2f}" if sms else "--"
@@ -238,7 +248,7 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
     by = {}
     for r in rows:
         by.setdefault((r["dataset"], r["method"], r["ablate"], r["stream"], r["threads"]), []).append(r)
-    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (per-edge on the same stream)"]
+    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (per-edge: per-op cost from the B=1 stream, charged x B)"]
     lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
     lines.append("Graph & Batch & No-merge & PerEdge & evals (N/B) & evals (P/B) \\\\")
@@ -248,7 +258,9 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         sp = f"{g}_s_b{ref_b}_p{ref_p}"
         rb = by.get((g, "batch", "full", s, "32"))
         rn = by.get((g, "batch", "nomerge", s, "32"))
-        rp = by.get((g, "peredge", "-", s, "1")) or by.get((g, "peredge", "-", sp, "1"))
+        rp = (by.get((g, "peredge", "-", f"{g}_b1_p{ref_p}", "1"))
+              or by.get((g, "peredge", "-", s, "1"))
+              or by.get((g, "peredge", "-", sp, "1")))
         if not any([rb, rn, rp]):
             continue
         def m_ms(rs):
@@ -257,13 +269,15 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         pms = None
         pev_ratio = "--"
         if rp:
-            pms = statistics.mean([float(r["lat_mean_ms"]) for r in rp])
+            pbsz = float(rp[0].get("batch_size") or 1)
             nb = float(rp[0].get("nbatches") or 1)
-            ev_op = statistics.mean([float(r["evals"]) / nb for r in rp])
+            popms = statistics.mean([float(r["lat_mean_ms"]) for r in rp]) / pbsz
+            pms = popms * float(ref_b)
             if rb:
                 nb_b = float(rb[0].get("nbatches") or 1)
-                ev_b = statistics.mean([float(r["evals"]) / nb_b for r in rb])
-                pev_ratio = f"{ev_op / ev_b:.1f}$\\times$"
+                ev_b = statistics.mean([float(r["evals"]) for r in rb]) / (nb_b * float(ref_b))
+                pe_total = statistics.mean([float(r["evals"]) for r in rp])
+                pev_ratio = f"{pe_total / (nb * pbsz) / ev_b:.1f}$\\times$"
         nev_ratio = "--"
         if rn and rb:
             nb_n = float(rn[0].get("nbatches") or 1)

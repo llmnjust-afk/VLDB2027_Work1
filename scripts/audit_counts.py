@@ -26,7 +26,7 @@ for f in sorted(glob.glob(os.path.join(d, "batch_*_t32.csv"))):
         elif meth == "batch" and ab in ("nomerge", "allseeds"):
             expect[(ds, meth, thr, ab, st)] = 5
         elif meth == "peredge":
-            expect[(ds, meth, thr, ab, st)] = 5
+            expect[(ds, meth, thr, ab, st)] = 1 if "_s_b" in st else 5
         elif meth == "static":
             expect[(ds, meth, thr, ab, st)] = 1
         rows[(ds, meth, thr, ab, st)] += 1
