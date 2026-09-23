@@ -18,13 +18,13 @@ The virtual-pop device is the technical heart of the paper: it lets a peeling th
 We prove the resulting procedure correct---the maintained decomposition is exact after every batch---and show that the region computed by our closure contains the true change set, so the peel never assigns a wrong value.
 
 We implemented the algorithm in C++ with a work-stealing thread pool and validated it with a differential-testing harness that compares the maintained decomposition against a static reference implementation after every batch, on randomized graphs, adversarial streams, and real-world datasets.
-Experiments over eight public graphs (25K to 69M edges) and streams of 200K updates show that batching collapses the multi-round fixpoint behavior of naive batch designs into one peeling pass, that the maintained decomposition is exact on every workload we tested, and that the sequential per-edge baseline is up to an order of magnitude slower than our batch algorithm on the same workloads while our algorithm approaches the cost of a single static decomposition on graphs with community structure.
+Experiments over eight public graphs (25K to 69M edges) and streams of 200K updates show that batching collapses the multi-round fixpoint behavior of naive batch designs into one peeling pass, that the maintained decomposition is exact on every workload we tested, and that a faithful sequential per-edge baseline charged for the same batched workloads is 42--345$\times$ slower per batch on the dense-community graphs, while our per-batch cost sits an order of magnitude below full recomputation on community-structured graphs and within a small factor of it on the densest ones.
 To summarize, this paper makes the following contributions:
 \begin{itemize}
 \item a batch-aware formulation of exact $k$-truss maintenance with a parallel three-stage algorithm: witness maintenance, mate closure, and single-pass region peeling with virtual boundary pops;
 \item a correctness argument showing the closure covers the true change set and the region peel reproduces full-graph peeling values exactly, including the exactly-once witness accounting that makes virtual pops sound;
 \item an open-source C++ implementation with a differential-testing harness that validates exactness batch by batch;
-\item an experimental evaluation over eight public graphs demonstrating that batching and the single-pass peel jointly deliver near-static maintenance costs on community-structured graphs.
+\item an experimental evaluation over eight public graphs demonstrating that batching and the single-pass peel deliver maintenance costs an order of magnitude below full recomputation on community-structured graphs, and mapping the dense-core regime in which recomputation itself is the right baseline.
 \end{itemize}
 
 The rest of the paper proceeds as follows.

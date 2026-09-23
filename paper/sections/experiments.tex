@@ -34,12 +34,12 @@ The maintained decomposition matched the oracle on every check on every workload
 \paragraph{Single-pass behavior (E2)}
 \label{par:singlepass}
 \Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline, measured per update on the $B{=}1$ stream of the same mix and charged $\times B$---per-edge applies updates one at a time no matter how the stream is cut into batches, so its per-op cost does not depend on $B$.
-Disabling merging costs XX--XX\% more per batch and XX$\times$ more support evaluations, because every seed triggers its own closure and peeling instead of sharing a single pass.
-The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs the resulting per-batch cost is 43--348$\times$ the batch pass (14--116$\times$ the support evaluations), while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method---per-edge is even marginally cheaper than the batch's fixed per-batch overhead there.
+Disabling merging costs 18--92\% more per batch on the community graphs but 89--247$\times$ on the dense-community graphs (85--234$\times$ the support evaluations), because every seed triggers its own closure and peeling instead of sharing a single pass.
+The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs the resulting per-batch cost is 42--345$\times$ the batch pass (14--116$\times$ the support evaluations), while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method---per-edge is even marginally cheaper than the batch's fixed per-batch overhead there.
 At $B{=}1$ the two paths sit within a small constant factor in both directions (the batch's parallel peel wins on email and wiki-Vote; per-edge's avoidance of per-batch region re-detection wins on Enron and Gnutella), so the batch advantage is created by amortization across the batch, not by any per-update edge.
 
 \begin{table}[tb]
-\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ workload (ms/batch; $T{=}32$; all cells are means of five runs; per-edge is charged $\times B$ from its $B$-invariant per-op cost).}
+\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ workload (ms/batch; $T{=}32$; all cells are means of five runs, three on YouTube; per-edge is charged $\times B$ from its $B$-invariant per-op cost).}
 \label{tab:singlepass}
 \input{tables/tab_singlepass}
 \end{table}
@@ -52,7 +52,7 @@ On every graph the closure grows sublinearly with $B$, but the growth regime dif
 \begin{figure}[tb]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/fig_regions}
-\caption{Maximum region size against batch size (log--log scale; shaded bands show the range over five runs).}
+\caption{Maximum region size against batch size (log--log scale; shaded bands show the range over the repetitions).}
 \label{fig:regions}
 \end{figure}
 
@@ -73,7 +73,7 @@ On the dense-community graphs, where insertion batches produce regions of tens o
 Across every graph and thread count we measure, the deviation from the $T{=}1$ value stays within 30\%.
 
 \begin{table}[tb]
-\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs).}
+\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs, three on YouTube).}
 \label{tab:scaling}
 \input{tables/tab_scaling}
 \end{table}
@@ -81,12 +81,11 @@ Across every graph and thread count we measure, the deviation from the $T{=}1$ v
 \paragraph{End-to-end comparison (E5--E6)}
 \label{par:endtoend}
 \Cref{tab:endtoend} reports mean per-batch latency on the $T{=}32$ grid.
-The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); on the dense-community graphs it lands 43--348$\times$ above the batch pass (email, wiki-Vote, Enron) and collapses to nearly free after the first destructive updates on Gnutella.
-The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one region peel: XX$\times$ on Amazon, XX$\times$ on Gnutella, and between XX$\times$ and XX$\times$ on the remaining large graphs.
-The single reversal is email-Eu-core, whose 25K edges form one dense community: every batch's affected region covers most of the graph, so batch maintenance costs about XX$\times$ a fresh decomposition---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
+The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); on the dense-community graphs it lands 42--345$\times$ above the batch pass (email, wiki-Vote, Enron) and collapses to nearly free after the first destructive updates on Gnutella.
+The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one batch pass: 10.1$\times$ on Amazon and 64.3$\times$ on Gnutella, where regions stay local, against 0.4--1.0$\times$ on the three dense-community graphs and YouTube, where every batch's recount sweep touches the dense core or the hub set and recomputation by the same peeling code is itself cheap enough that incremental maintenance buys at most parity (email 1.0$\times$) or loses by up to 2.6$\times$ (Enron 0.4$\times$)---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
 
 \begin{table}[tb]
-\caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std).}
+\caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std, three on YouTube).}
 \label{tab:endtoend}
 \input{tables/tab_endtoend}
 \end{table}
