@@ -39,7 +39,7 @@ After the witness phase, the algorithm knows every edge whose support changed: t
 These are the \emph{seeds} $S$.
 A deleted edge may be seeded as a mate of another batch edge, or be a seed through its own deletion; only edges still present in the graph are seeded, and deleted edges are collected into the seed scan before their removal from the adjacency, so a mate that is itself deleted is dropped by the alive-guard at seeding time.
 An obvious alternative---seeding every edge enumerated by phase 1, including mates whose support did not change---enlarges the seed set without enlarging the guaranteed change set.
-Our implementation supports both modes (\texttt{--ablate allseeds}) and the experiments (\Cref{sec:experiments}) show that precise seeding shrinks regions measurably on community-structured graphs.
+Our implementation supports both modes (\texttt{--ablate allseeds}) and the experiments (\Cref{sec:experiments}) show that the analysis is tight: the two modes produce identical regions on every graph we measure, so the per-edge support check costs nothing in region quality.
 
 \paragraph{Region closure}
 The region is a superset of the truss-connected closure of $S$.

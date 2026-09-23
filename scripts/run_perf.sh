@@ -84,16 +84,23 @@ worker() {
         ;;
     esac
   fi
-  # per-edge baseline on small graphs (reduced stream)
+  # per-edge baseline on small graphs (reduced stream + the full b1/b1000 workloads)
   case $gname in
     email|wikivote|enron|gnutella)
+      local pcsv=$OUT/peredge_${gname}.csv; touch "$pcsv"
       for bs in 1 10 100 1000; do
         local st=$S/${gname}_s_b${bs}_p0.5.txt
         [ -s "$st" ] || continue
-        local pcsv=$OUT/peredge_${gname}.csv; touch "$pcsv"
         grep -q "${gname},peredge,1,-,${gname}_s_b${bs}_p0.5," "$pcsv" 2>/dev/null && continue
         $B peredge --graph "$graph" --stream "$st" --dataset $gname >> "$pcsv" 2>/dev/null
         echo "[$gname] peredge b$bs"
+      done
+      for bs in 1 1000; do
+        local mst=$S/${gname}_b${bs}_p0.5.txt
+        [ -s "$mst" ] || continue
+        grep -q "${gname},peredge,1,-,${gname}_b${bs}_p0.5," "$pcsv" 2>/dev/null && continue
+        $B peredge --graph "$graph" --stream "$mst" --dataset $gname >> "$pcsv" 2>/dev/null
+        echo "[$gname] peredge b$bs full"
       done ;;
   esac
   # build-only (empty stream)

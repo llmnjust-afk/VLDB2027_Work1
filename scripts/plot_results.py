@@ -99,13 +99,13 @@ def emit_endtoend(agg, outdir, static_by_g, ref_b="1000", ref_p="0.5"):
     lines.append("Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\\\")
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
-        b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32")) or agg.get((g, "batch", "full", f"{g}_s_b{ref_b}_p{ref_p}", "32"))
-        p = agg.get((g, "peredge", "full", f"{g}_b{ref_b}_p{ref_p}", "32")) or agg.get((g, "peredge", "-", f"{g}_s_b{ref_b}_p{ref_p}", "1")) or agg.get((g, "peredge", "full", f"{g}_s_b{ref_b}_p{ref_p}", "32"))
+        b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
+        p = agg.get((g, "peredge", "-", f"{g}_b{ref_b}_p{ref_p}", "1")) or agg.get((g, "peredge", "-", f"{g}_s_b{ref_b}_p{ref_p}", "1"))
         sms = static_by_g.get(g)
         if not any([b, p, sms]):
             continue
         bms = b["ms"][0] if b and b["ms"] else None
-        pms = p["ms"][0] if p and p["ms"] else None
+        pms = p["ms"][0] if (p and p["ms"]) else None
         r1 = f"{bms:.2f}" if bms else "--"
         r2 = f"{pms:.2f}" if pms else "--"
         r3 = f"{sms:.2f}" if sms else "--"
@@ -238,7 +238,7 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
     by = {}
     for r in rows:
         by.setdefault((r["dataset"], r["method"], r["ablate"], r["stream"], r["threads"]), []).append(r)
-    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (peredge scaled to batch-equivalent)"]
+    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (per-edge on the same stream)"]
     lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
     lines.append("Graph & Batch & No-merge & PerEdge & evals (N/B) & evals (P/B) \\\\")
@@ -248,7 +248,7 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         sp = f"{g}_s_b{ref_b}_p{ref_p}"
         rb = by.get((g, "batch", "full", s, "32"))
         rn = by.get((g, "batch", "nomerge", s, "32"))
-        rp = by.get((g, "peredge", "-", sp, "1"))
+        rp = by.get((g, "peredge", "-", s, "1")) or by.get((g, "peredge", "-", sp, "1"))
         if not any([rb, rn, rp]):
             continue
         def m_ms(rs):
@@ -257,14 +257,13 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         pms = None
         pev_ratio = "--"
         if rp:
-            bsz = float(rp[0].get("batch_size") or 1)
-            pms = statistics.mean([float(r["lat_mean_ms"]) for r in rp]) * bsz
+            pms = statistics.mean([float(r["lat_mean_ms"]) for r in rp])
             nb = float(rp[0].get("nbatches") or 1)
             ev_op = statistics.mean([float(r["evals"]) / nb for r in rp])
             if rb:
                 nb_b = float(rb[0].get("nbatches") or 1)
                 ev_b = statistics.mean([float(r["evals"]) / nb_b for r in rb])
-                pev_ratio = f"{(ev_op * bsz) / ev_b:.1f}$\\times$"
+                pev_ratio = f"{ev_op / ev_b:.1f}$\\times$"
         nev_ratio = "--"
         if rn and rb:
             nb_n = float(rn[0].get("nbatches") or 1)
