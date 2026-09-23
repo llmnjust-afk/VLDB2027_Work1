@@ -35,7 +35,7 @@ The maintained decomposition matched the oracle on every check on every workload
 \label{par:singlepass}
 \Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline, measured per update on the $B{=}1$ stream of the same mix and charged $\times B$---per-edge applies updates one at a time no matter how the stream is cut into batches, so its per-op cost does not depend on $B$.
 Disabling merging costs XX--XX\% more per batch and XX$\times$ more support evaluations, because every seed triggers its own closure and peeling instead of sharing a single pass.
-The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs the resulting per-batch cost is XX--XX$\times$ the batch pass (XX--XX$\times$ the support evaluations), while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method---per-edge is even marginally cheaper than the batch's fixed per-batch overhead there.
+The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs the resulting per-batch cost is 43--348$\times$ the batch pass (14--116$\times$ the support evaluations), while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method---per-edge is even marginally cheaper than the batch's fixed per-batch overhead there.
 At $B{=}1$ the two paths sit within a small constant factor in both directions (the batch's parallel peel wins on email and wiki-Vote; per-edge's avoidance of per-batch region re-detection wins on Enron and Gnutella), so the batch advantage is created by amortization across the batch, not by any per-update edge.
 
 \begin{table}[tb]
@@ -47,8 +47,7 @@ At $B{=}1$ the two paths sit within a small constant factor in both directions (
 \paragraph{Region sizes (E3)}
 \label{par:regions}
 \Cref{fig:regions} plots the maximum region size against the batch size, and \Cref{tab:regions} tabulates the same profile.
-On single-community graphs the closure covers the dense component regardless of $B$; on community graphs the closure stays local and grows sublinearly with $B$.
-The event-to-region ratio stays below XX on all but the single-community graphs, which quantifies the perimeter argument of \Cref{sec:method-peel}.
+On every graph the closure grows sublinearly with $B$, but the growth regime differs sharply with structure: expressed per update, the closure adds $0.5$--$1.6$ edges per operation at $B{=}10$K on the three community graphs and $2.5$--$8.6$ on the three dense-community graphs, and as a fraction of the final graph the maximum region stays at or below $3\%$ on the former while reaching $11\%$ (Enron), $18\%$ (wiki-Vote), and $95\%$ (email) on the latter---the perimeter argument of \Cref{sec:method-peel} made concrete: batch work scales with the boundary of the affected structure, not with the batch size.
 
 \begin{figure}[tb]
 \centering
@@ -66,11 +65,12 @@ The event-to-region ratio stays below XX on all but the single-community graphs,
 \paragraph{Scaling (E4)}
 \label{par:scaling}
 We evaluate thread scaling on the $B{=}1000$, $p{=}0.5$ workload of each graph, sweeping $T\in\{1,8,32,256\}$ on the five graphs where the full sweep is affordable and reporting the $T{=}32$ operating point of the three largest graphs (\Cref{tab:scaling}).
-The design goal is not speedup but the absence of pathological degradation: with adaptive dispatch, phases whose task counts fall below the dispatch threshold run inline on the calling thread, so per-batch latency stays within noise of its $T{=}1$ value across the entire thread range, and the persistent pool absorbs the phases that do exceed the threshold without paying a spawn cost.
+The design goal is not speedup but the absence of pathological degradation: with adaptive dispatch, phases whose task counts fall below the dispatch threshold run inline on the calling thread, so per-batch latency tracks its $T{=}1$ value across the entire thread range, and the persistent pool absorbs the phases that do exceed the threshold without paying a spawn cost.
 The contrast with a naive parallelization is stark.
 Our first implementation spawned $T{-}1$ operating-system threads per phase; on the 147K-edge Gnutella workload its per-batch latency rose almost linearly with the thread count, from 0.53\,ms at $T{=}1$ to 2.7\,ms at $T{=}2$, 6.7\,ms at $T{=}8$, and 30.4\,ms at $T{=}32$---a 57$\times$ slowdown at 32 threads on work whose sequential cost is half a millisecond.
-With the persistent pool and adaptive dispatch, the same workload holds at 0.5--0.6\,ms per batch from $T{=}1$ through $T{=}256$.
-On the densest graphs, where insertion batches produce regions above 90K edges, the pool-dispatched recount phases engage at large $T$; their contribution is bounded by the sequential sweep that dominates end-to-end latency, so whole-batch latency stays within XX\% of its $T{=}1$ value on every graph and thread count we measure.
+With the persistent pool and adaptive dispatch, the same workload holds at 0.48--0.62\,ms per batch from $T{=}1$ through $T{=}256$.
+On the dense-community graphs, where insertion batches produce regions of tens of thousands of edges, the pool-dispatched recount phases engage at large $T$ and per-batch latency ends 19--39\% \emph{below} its $T{=}1$ value; on the two sparse graphs, whose entire $B{=}1000$ workload costs half a millisecond, the same pool overheads surface as a rise of at most 29\% (at most $0.14$\,ms on Gnutella).
+Across every graph and thread count we measure, the deviation from the $T{=}1$ value stays within 30\%.
 
 \begin{table}[tb]
 \caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs).}
@@ -81,7 +81,7 @@ On the densest graphs, where insertion batches produce regions above 90K edges, 
 \paragraph{End-to-end comparison (E5--E6)}
 \label{par:endtoend}
 \Cref{tab:endtoend} reports mean per-batch latency on the $T{=}32$ grid.
-The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); on the community graphs it lands XX--XX$\times$ above the batch pass (email, wiki-Vote, Enron) and collapses to nearly free after the first destructive updates on Gnutella.
+The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); on the dense-community graphs it lands 43--348$\times$ above the batch pass (email, wiki-Vote, Enron) and collapses to nearly free after the first destructive updates on Gnutella.
 The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one region peel: XX$\times$ on Amazon, XX$\times$ on Gnutella, and between XX$\times$ and XX$\times$ on the remaining large graphs.
 The single reversal is email-Eu-core, whose 25K edges form one dense community: every batch's affected region covers most of the graph, so batch maintenance costs about XX$\times$ a fresh decomposition---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
 
