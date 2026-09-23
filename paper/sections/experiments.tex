@@ -9,7 +9,7 @@ Our code, the stream generator, and the scripts that reproduce every table and f
 \textbf{Datasets.}
 We use eight public graphs spanning three structural regimes: single dense community (email-Eu-core, wiki-Vote, email-Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
 \textbf{Streams.}
-For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; the stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
+For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; for $B{=}1$ the streams use $20$K single-update batches instead, which keeps the single-update grid tractable on the largest graphs while per-batch statistics have long converged, and the stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, with the generated stream files archived for reproducibility.
 \textbf{Metrics.}
 Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, region size, event count, and speedup over the two baselines.
 \textbf{Baselines.}
@@ -44,12 +44,19 @@ The per-edge baseline is slower by two to three orders of magnitude on every gra
 
 \paragraph{Region sizes (E3)}
 \label{par:regions}
-Region size against batch size for the eight graphs is summarized in \Cref{tab:regions}.
+\Cref{fig:regions} plots the maximum region size against the batch size, and \Cref{tab:regions} tabulates the same profile.
 On single-community graphs the closure covers the dense component regardless of $B$; on community graphs the closure stays local and grows sublinearly with $B$.
 The event-to-region ratio stays below XX on all but the single-community graphs, which quantifies the perimeter argument of \Cref{sec:method-peel}.
 
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/fig_regions}
+\caption{Maximum region size against batch size (log--log scale; shaded bands show the range over five runs).}
+\label{fig:regions}
+\end{figure}
+
 \begin{table}[tb]
-\caption{Region-size profile (mean and maximum region size per graph).}
+\caption{Maximum region size (edges) against batch size ($p{=}0.5$, $T{=}32$).}
 \label{tab:regions}
 \input{tables/tab_regions}
 \end{table}

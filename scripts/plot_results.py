@@ -189,6 +189,50 @@ def emit_regions(agg, outdir):
         f.write("\n".join(lines) + "\n")
 
 
+def emit_fig_regions(rows, outdir):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    palette = ["#0072B2", "#E69F00", "#564E4D", "#009E73", "#D55E00", "#8172B3", "#87A0C5", "#F4C2A1"]
+    BS = [1, 10, 100, 1000, 10000]
+    fig, ax = plt.subplots(figsize=(6.2, 3.4))
+    gi = 0
+    for g in GRAPH_ORDER:
+        xs, means, los, his = [], [], [], []
+        for b in BS:
+            vals = [float(r["region_max"]) for r in rows
+                    if r["dataset"] == g and r["method"] == "batch" and r["ablate"] == "full"
+                    and r["stream"] == f"{g}_b{b}_p0.5" and r.get("region_max")]
+            if not vals:
+                continue
+            m = sum(vals) / len(vals)
+            xs.append(b)
+            means.append(m)
+            los.append(min(vals))
+            his.append(max(vals))
+        if not xs:
+            continue
+        c = palette[gi % len(palette)]
+        ax.plot(xs, means, "-", color=c, marker="o", markersize=4, linewidth=1.4, label=g)
+        ax.fill_between(xs, los, his, color=c, alpha=0.22, linewidth=0.8)
+        gi += 1
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Batch size $B$")
+    ax.set_ylabel("Maximum region size (edges)")
+    ax.set_xticks(BS)
+    ax.set_xticklabels(["1", "10", "100", "1000", "10$^4$"])
+    ax.grid(True, which="both", linewidth=0.5)
+    ax.legend(loc="lower right", ncol=3, frameon=False, fontsize=7)
+    figdir = os.path.join(os.path.dirname(outdir.rstrip("/")), "figures")
+    os.makedirs(figdir, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(os.path.join(figdir, "fig_regions.pdf"), bbox_inches="tight")
+    fig.savefig(os.path.join(figdir, "fig_regions.png"), bbox_inches="tight", dpi=140)
+    plt.close(fig)
+    print(f"wrote {figdir}/fig_regions.pdf ({gi} graphs)")
+
+
 def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
     import statistics
     by = {}
@@ -330,6 +374,7 @@ def main(resdir, outdir):
     emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
     emit_regions(agg, outdir)
+    emit_fig_regions(rows, outdir)
     emit_ablation(agg, outdir)
     print(f"wrote tables to {outdir}")
 
