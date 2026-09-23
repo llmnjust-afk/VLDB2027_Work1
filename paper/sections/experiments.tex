@@ -21,7 +21,7 @@ Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, reg
 \label{par:correctness}
 We validate exactness on two workload families.
 The first is a matrix of two controlled random graphs---one with a single dense community, one with community structure---streamed as 24 update streams of 40 mixed batches each and executed under all three code paths of \Cref{tab:singlepass} at four threads, with the maintained decomposition compared against a from-scratch static peeling after every batch on the smallest streams, every 25th batch on the hundred-edge streams, every 50th batch on the thousand-edge streams, and at the end of every stream.
-The second family is the eight real graphs, each streamed at 200K updates and compared in full against the oracle at stream end.
+The second family is the eight real graphs, each streamed with the workloads of \Cref{par:setup} and compared in full against the oracle at stream end.
 The maintained decomposition matched the oracle on every check on every workload; the matrix also exercises adversarial shapes indirectly, since the streams contain whole-stream deletion phases ($p{=}0$), whole-stream insertion phases ($p{=}1$), balanced mixes, and re-insertions of previously deleted edges.
 \Cref{tab:correctness} summarizes the counts.
 
