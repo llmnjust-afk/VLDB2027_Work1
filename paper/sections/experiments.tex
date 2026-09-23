@@ -33,12 +33,12 @@ The maintained decomposition matched the oracle on every check on every workload
 
 \paragraph{Single-pass behavior (E2)}
 \label{par:singlepass}
-\Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline executed on the same stream.
+\Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline, measured per update on the $B{=}1$ stream of the same mix and charged $\times B$---per-edge applies updates one at a time no matter how the stream is cut into batches, so its per-op cost does not depend on $B$.
 Disabling merging costs XX--XX\% more per batch and XX$\times$ more support evaluations, because every seed triggers its own closure and peeling instead of sharing a single pass.
 The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs its per-update frontier spans the dense component, XX--XX$\times$ the batch pass, while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method.
 
 \begin{table}[tb]
-\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ stream (ms/batch; per-edge on the same stream; $T{=}32$, mean of five runs).}
+\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ workload (ms/batch; $T{=}32$; all cells are means of five runs; per-edge is charged $\times B$ from its $B$-invariant per-op cost).}
 \label{tab:singlepass}
 \input{tables/tab_singlepass}
 \end{table}
@@ -80,7 +80,7 @@ On the densest graphs, where insertion batches produce regions above 90K edges, 
 \paragraph{End-to-end comparison (E5--E6)}
 \label{par:endtoend}
 \Cref{tab:endtoend} reports mean per-batch latency on the $T{=}32$ grid.
-The per-edge baseline executes every update through its own closure and fixpoint; its cost tracks the per-update frontier, which spans the dense component on the community graphs (XX--XX$\times$ the batch pass on email and Enron) and collapses to nearly free after the first destructive updates on Gnutella.
+The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); it tracks the per-update frontier, which spans the dense component on the community graphs (XX--XX$\times$ the batch pass on email and Enron) and collapses to nearly free after the first destructive updates on Gnutella.
 The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one region peel: XX$\times$ on Amazon, XX$\times$ on Gnutella, and between XX$\times$ and XX$\times$ on the remaining large graphs.
 The single reversal is email-Eu-core, whose 25K edges form one dense community: every batch's affected region covers most of the graph, so batch maintenance costs about XX$\times$ a fresh decomposition---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
 
