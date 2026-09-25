@@ -1,7 +1,7 @@
 \label{sec:experiments}
 
-Our experimental study is organized around the claims of the paper: the algorithm is exact (E1), batching collapses multi-round behavior into a single pass (E2), region sizes are governed by graph structure (E3), the parallel phases scale (E4), and the end-to-end latency improves over both a static-recompute baseline and a sequential per-edge baseline (E5--E6), with ablations isolating the contribution of each design decision (E7--E8).
-All experiments run on a single socket with $32$ physical cores ($256$ GB RAM); every reported number is the mean of five runs (three on the three largest graphs), with the standard deviation reported alongside.
+Our experimental study is organized around the claims of the paper: the algorithm is exact (E1), batching collapses multi-round behavior into a single pass (E2), region sizes are governed by graph structure (E3), the parallel phases scale (E4), the end-to-end latency improves over both a static-recompute baseline and a sequential per-edge baseline (E5), and ablations isolate the contribution of each design decision (E6--E7).
+All experiments run on a single socket with $32$ physical cores ($256$ GB RAM); table numbers are means of five runs, three on the three largest graphs, and the giant mixed-leg workloads ($p\in\{0.75,0.25\}$) run one repetition each for artifact-level auditing.
 Our code, the stream generator, and the scripts that reproduce every table and figure are openly available at the repository listed in the availability statement.
 
 \paragraph{Setup}
@@ -10,6 +10,7 @@ Our code, the stream generator, and the scripts that reproduce every table and f
 We use eight public graphs spanning three structural regimes: single dense community (email-Eu-core, wiki-Vote, email-Enron), community structure (Amazon, YouTube, LiveJournal, Gnutella), and skew web (skitter).
 \textbf{Streams.}
 For each graph we generate update streams of $200$K operations in batches of size $B\in\{1,10,100,1000,10000\}$ with insertion ratio $p\in\{1.0, 0.5, 0.0\}$, plus $p\in\{0.75, 0.25\}$ at $B{=}1000$; the three-mix grid runs at $B\in\{1, 1000, 10000\}$, while $B\in\{10, 100\}$ runs $p{=}0.5$ only, and on the three largest graphs all $B\le 100$ streams use $2$K operations, where per-batch statistics have long converged; on LiveJournal and Skitter we further drop the $B{=}1$ stream, whose few thousand single updates each trigger hub-scale cascades that dominate the rest of the protocol combined, and the three largest graphs run three repetitions throughout.
+All streams are generated with a fixed seed ($42$), and the sequential per-edge baseline on the small graphs uses dedicated $50$K-operation streams so that its full-length runs stay within budget.
 The stream generator replays updates uniformly over the edge set while keeping the graph above a minimum size, and the generated stream files are archived for reproducibility.
 \textbf{Metrics.}
 Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, region size, event count, and speedup over the two baselines.
@@ -17,7 +18,7 @@ Per-batch latency (ms/batch), throughput (ops/s), total support evaluations, reg
 \emph{Static}: full re-decomposition of the current graph after each batch, computed by the same peeling code that serves as the exactness oracle.
 \emph{PerEdge}: our faithful reimplementation of the sequential per-edge maintenance discipline---each batch update is applied independently with its own closure and fixpoint---which is the strongest honest proxy for the per-update algorithms of \Cref{sec:related} within our framework.
 
-\paragraph{Correctness under adversarial streams (E1)}
+\paragraph{Correctness under adversarial update profiles (E1)}
 \label{par:correctness}
 We validate exactness on two workload families.
 The first is a matrix of two controlled random graphs---one with a single dense community, one with community structure---streamed as 24 update streams of 40 mixed batches each and executed under all three code paths of \Cref{tab:singlepass} at four threads, with the maintained decomposition compared against a from-scratch static peeling after every batch on the smallest streams, every 25th batch on the hundred-edge streams, every 50th batch on the thousand-edge streams, and at the end of every stream.
@@ -26,7 +27,7 @@ The maintained decomposition matched the oracle on every check on every workload
 \Cref{tab:correctness} summarizes the counts.
 
 \begin{table}[tb]
-\caption{Differential-testing summary (maintained vs.\ static oracle).}
+\caption{Differential-testing summary (maintained vs.\ static oracle; the synthetic matrix executes each stream under all three code paths of \Cref{tab:singlepass}, the real graphs are checked at stream end).}
 \label{tab:correctness}
 \input{tables/tab_correctness}
 \end{table}
@@ -36,10 +37,10 @@ The maintained decomposition matched the oracle on every check on every workload
 \Cref{tab:singlepass} contrasts the three code paths on the $B{=}1000$, $p{=}0.5$ workload of each graph: the merged batch pass, the batch pass with merging disabled (each seed closed and peeled separately), and the per-edge baseline, measured per update on the $B{=}1$ stream of the same mix and charged $\times B$---per-edge applies updates one at a time no matter how the stream is cut into batches, so its per-op cost does not depend on $B$.
 Disabling merging costs 18--92\% more per batch on the community graphs but 89--247$\times$ on the dense-community graphs (85--234$\times$ the support evaluations), because every seed triggers its own closure and peeling instead of sharing a single pass.
 The per-edge baseline executes the same updates one at a time, each with its own closure and fixpoint; on the dense-community graphs the resulting per-batch cost is 42--345$\times$ the batch pass (14--116$\times$ the support evaluations), while on the fragile low-truss Gnutella topology the first destructive updates collapse the structure and the remaining updates are nearly free for every method---per-edge is even marginally cheaper than the batch's fixed per-batch overhead there.
-At $B{=}1$ the two paths sit within a small constant factor in both directions (the batch's parallel peel wins on email and wiki-Vote; per-edge's avoidance of per-batch region re-detection wins on Enron and Gnutella), so the batch advantage is created by amortization across the batch, not by any per-update edge.
+At $B{=}1$ the per-op columns of \Cref{tab:singlepass} show the two paths within a small constant factor in both directions---the batch's parallel peel wins on email ($7.9$ vs.\ $13.6$\,ms/op) and wiki-Vote ($27.2$ vs.\ $56.3$), and per-edge's avoidance of per-batch region re-detection wins on Enron ($9.95$ vs.\ $32.5$) and Gnutella ($0.0005$ vs.\ $0.002$)---so the batch advantage is created by amortization across the batch, not by any per-update edge.
 
 \begin{table}[tb]
-\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ workload (ms/batch; $T{=}32$; all cells are means of five runs, three on YouTube, LiveJournal, and Skitter; per-edge is charged $\times B$ from its $B$-invariant per-op cost).}
+\caption{Batch, no-merge, and per-edge costs on the $B{=}1000$, $p{=}0.5$ workload (ms/batch; $T{=}32$; per-edge is charged $\times B$ from its $B$-invariant per-op cost, and the last two columns report the per-op costs themselves; means of five runs, three on YouTube, LiveJournal, and Skitter; dashes mark configurations not run, and the corresponding claims are scoped to the measured graphs).}
 \label{tab:singlepass}
 \input{tables/tab_singlepass}
 \end{table}
@@ -57,7 +58,7 @@ On every graph the closure grows sublinearly with $B$, but the growth regime dif
 \end{figure}
 
 \begin{table}[tb]
-\caption{Maximum region size (edges) against batch size ($p{=}0.5$, $T{=}32$).}
+\caption{Maximum region size (edges) against batch size ($p{=}0.5$, $T{=}32$; $R/B{=}1$ is not run on LiveJournal and Skitter by the protocol of \Cref{par:setup}).}
 \label{tab:regions}
 \input{tables/tab_regions}
 \end{table}
@@ -69,35 +70,36 @@ The design goal is not speedup but the absence of pathological degradation: with
 The contrast with a naive parallelization is stark.
 Our first implementation spawned $T{-}1$ operating-system threads per phase; on the 147K-edge Gnutella workload its per-batch latency rose almost linearly with the thread count, from 0.53\,ms at $T{=}1$ to 2.7\,ms at $T{=}2$, 6.7\,ms at $T{=}8$, and 30.4\,ms at $T{=}32$---a 57$\times$ slowdown at 32 threads on work whose sequential cost is half a millisecond.
 With the persistent pool and adaptive dispatch, the same workload holds at 0.48--0.62\,ms per batch from $T{=}1$ through $T{=}256$.
-On the dense-community graphs, where insertion batches produce regions of tens of thousands of edges, the pool-dispatched recount phases engage at large $T$ and per-batch latency ends 19--39\% \emph{below} its $T{=}1$ value; on the two sparse graphs, whose entire $B{=}1000$ workload costs half a millisecond, the same pool overheads surface as a rise of at most 29\% (at most $0.14$\,ms on Gnutella).
+On the dense-community graphs, where insertion batches produce regions of tens of thousands of edges, the pool-dispatched recount phases engage at large $T$ and per-batch latency at $T{=}32$ ends 34--39\% \emph{below} its $T{=}1$ value; on the two sparse graphs, whose entire $B{=}1000$ workload costs half a millisecond, the same pool overheads surface as a rise of at most 29\% (at most $0.14$\,ms on Gnutella).
 Across every graph and thread count we measure, the deviation from the $T{=}1$ value stays within 30\%.
 
 \begin{table}[tb]
-\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs, three on YouTube, LiveJournal, and Skitter).}
+\caption{Thread scaling on the $B{=}1000$, $p{=}0.5$ workload (ms/batch, mean of five runs, three on YouTube, LiveJournal, and Skitter; the three largest graphs report the $T{=}32$ operating point only, as marked by dashes; $T{=}256$ deliberately oversubscribes the 32-core socket).}
 \label{tab:scaling}
 \input{tables/tab_scaling}
 \end{table}
 
-\paragraph{End-to-end comparison (E5--E6)}
+\paragraph{End-to-end comparison (E5)}
 \label{par:endtoend}
 \Cref{tab:endtoend} reports mean per-batch latency on the $T{=}32$ grid.
 The per-edge baseline executes every update through its own closure and fixpoint, so its cost is again charged per update ($\times B$ for a $B$-update batch); on the dense-community graphs it lands 42--345$\times$ above the batch pass (email, wiki-Vote, Enron) and collapses to nearly free after the first destructive updates on Gnutella.
-The static baseline recomputes the full decomposition after every batch, so the batch algorithm's advantage is the ratio between one static decomposition and one batch pass: 10.1$\times$ on Amazon and 64.3$\times$ on Gnutella, where regions stay local, against 0.4--1.0$\times$ on email, wiki-Vote, Enron, LiveJournal, YouTube, and Skitter, where every batch's recount sweep touches the dense core or the hub set and recomputation by the same peeling code is itself cheap enough that incremental maintenance buys at most parity (email 1.0$\times$) or loses by up to 2.6$\times$ (Enron 0.4$\times$)---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
+The static baseline recomputes the full decomposition after every batch, so \Cref{tab:endtoend} reports PerEdge/Batch and Static/Batch, the advantage of batching over each baseline: Static/Batch is 10.1$\times$ on Amazon and 64.3$\times$ on Gnutella, where regions stay local, against 0.4--1.0$\times$ on email, wiki-Vote, Enron, LiveJournal, YouTube, and Skitter, where every batch's recount sweep touches the dense core or the hub set and recomputation by the same peeling code is itself cheap enough that incremental maintenance buys at most parity (email 1.0$\times$) or loses by up to 2.6$\times$ (Enron 0.4$\times$)---the regime in which no incremental strategy can beat recomputation, and also where the per-edge baseline is at its worst.
+The mechanism behind the parity regime is degree weighting: the recount and sweep terms scale with the degrees of the region's edges rather than their count, so a region of a few hundred hub-adjacent edges on YouTube or Skitter costs as much to process as a full-graph peel, while a locally bounded community keeps every term small.
 
 \begin{table}[tb]
-\caption{End-to-end comparison at $T{=}32$ (ms/batch, mean of five runs $\pm$ std, three on YouTube, LiveJournal, and Skitter).}
+\caption{End-to-end comparison at $T{=}32$ (ms/batch; per-edge is charged $\times B$ from its $B$-invariant per-op cost; means of five runs, three on YouTube, LiveJournal, and Skitter; dashes mark baselines not run on the giant graphs, and Static/Batch below $1$ means recomputation is the cheaper choice).}
 \label{tab:endtoend}
 \input{tables/tab_endtoend}
 \end{table}
 
-\paragraph{Ablations (E7--E8)}
+\paragraph{Ablations (E6--E7)}
 \label{par:ablation}
-\Cref{tab:ablation} isolates two design decisions on the $B{=}1000$, $p{=}0.5$ workload of each graph.
+\Cref{tab:ablation} isolates two design decisions on the $B{=}1000$, $p{=}0.5$ workload of each graph; the ablation legs run on the five smaller graphs, and on the giant graphs they are out of budget---disabling merging pays region closure and peeling once per \emph{seed} instead of once per \emph{batch}, which on the dense-community graphs surcharges per-batch cost by 89--246$\times$ (\Cref{tab:singlepass}), i.e., weeks to months per full stream.
 \emph{Merging on/off}: disabling region merging forces one peel per seed; the gap quantifies \Cref{sec:method-peel}'s amortization.
 \emph{Precise vs.\ all-seeds}: seeding every enumerated edge rather than only support-changed ones yields regions identical to \textsc{Full}'s on every graph we measure and latency within a few percent, which is the empirical statement that the seeding analysis is tight: support-changed edges already cover every edge whose truss membership can change.
 
 \begin{table}[tb]
-\caption{Ablations on the $B{=}1000$, $p{=}0.5$ workload at $T{=}32$: latency (ms/batch) and maximum region size, mean of five runs (three on YouTube, LiveJournal, and Skitter).}
+\caption{Ablations on the $B{=}1000$, $p{=}0.5$ workload at $T{=}32$: latency (ms/batch) and maximum region size; means of five runs, three on YouTube, LiveJournal, and Skitter (the ``full'' column); the no-merge and all-seeds legs run on the five smaller graphs only, as marked by dashes.}
 \label{tab:ablation}
 \input{tables/tab_ablation}
 \end{table}

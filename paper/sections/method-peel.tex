@@ -48,8 +48,14 @@ If the full peeling pops a frozen edge $Y$ with $Y$ adjacent to no region edge, 
 The support sequences therefore agree, and by induction the assigned values agree; the unchanged edges are correct by \Cref{lem:coverage}.
 \end{proof}
 
+\begin{proposition}[Work per batch]
+\label{prop:work}
+Let $b$ be a batch and $R$ the region produced by the closure, with boundary triangle count $\Delta$.
+The batch costs $O\!\big(\sum_{f\in b}(\deg(f_1)+\deg(f_2))\big)$ work in the witness phase, $O\!\big(\sum_{e\in R}(\deg(e_1)+\deg(e_2))\big)$ in the recount, and $O\!\big(\sum_{e\in R}\mathrm{psup}(e) + \Delta\big)$ in the sweep and event collection, each spread over $T$ threads; no term scales with the graph size $m$ except through the region it induces.
+\end{proposition}
+
 \paragraph{Why one pass beats fixpoint}
 A natural batch design applies each update with the per-edge machinery of prior work, or, in batch form, propagates support decrements iteratively until a fixpoint.
 Both pay for the region once per iteration, and the number of iterations grows with the depth of the peeling cascade---on dense communities the cascade spans the entire support range, so the fixpoint cost multiplies the per-update cost rather than amortizing it.
-The single-pass design replaces iteration with a bounded sweep whose work is $O\!\big(\sum_{e\in R}\mathrm{psup}(e)\big)$ independent of the batch size; batching enters only through the shared region, so ten thousand co-located updates cost one traversal, not ten thousand.
-The events add a term $O(\Delta)$, where $\Delta$ counts region-boundary triangles---bounded by the region's perimeter, which the experiments show stays a small fraction of the region for community graphs.
+The single-pass design replaces iteration with a bounded sweep whose work is given by \Cref{prop:work}: the sweep term $O\!\big(\sum_{e\in R}\mathrm{psup}(e)\big)$ is independent of the batch size; batching enters only through the shared region, so ten thousand co-located updates cost one traversal, not ten thousand.
+The events add the term $O(\Delta)$, which counts region-boundary triangles---bounded by the region's perimeter, which the experiments show stays a small fraction of the region for community graphs.

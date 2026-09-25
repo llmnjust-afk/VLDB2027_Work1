@@ -54,6 +54,7 @@ If $\tau_{G'}(e)\ne \tau_G(e)$ for some edge $e$, then $e\in C$.
 \end{lemma}
 
 \begin{proof}
+Throughout, peeling is made deterministic by breaking ties within a bucket in a fixed edge order, so pop positions are comparable across runs.
 Run the peeling of \Cref{def:peeling} on $G$ and on $G'$, and let $e$ be an edge whose values differ.
 Consider the first time the two peelings assign $e$ different values; without loss of generality the pops differ, so some mate $g$ of $e$ is popped at a different sweep position in the two runs.
 Following the pop positions backwards, there is a first edge whose pop position differs because its own support sequence differs; supports differ only when a triangle witness is created or destroyed (a batch edge, hence in $S$) or when a mate with an earlier position difference decrements it.

@@ -1,7 +1,8 @@
 % E5: end-to-end at T=32, B=1000, p=0.5 (per-edge: per-op cost from the B=1 stream, charged x B)
+% Ratio columns are PerEdge/Batch and Static/Batch (advantage of batching; Static/Batch < 1 means recomputation is cheaper).
 \begin{tabular}{lrrrrr}
 \toprule
-Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\
+Graph & Batch & PerEdge & Static & PerEdge/Batch & Static/Batch \\
 \midrule
 email & 94.10 & 13633.10 & 96.00 & 144.9$\times$ & 1.0$\times$ \\
 wikivote & 163.24 & 56275.42 & 68.00 & 344.7$\times$ & 0.4$\times$ \\

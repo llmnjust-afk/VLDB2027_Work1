@@ -1,8 +1,11 @@
-% E1: differential-testing summary from the synthetic matrix log
+% E1: differential-testing summary.
+% Row 1: the synthetic matrix (2 controlled graphs x 3 batch sizes x 4 insertion ratios = 24 streams of 40 batches,
+% each executed under all three code paths of Table 2). Row 2: the eight real graphs, checked at stream end.
 \begin{tabular}{lrrr}
 \toprule
-Method & streams & batches & mismatched edges \\
+Workload family & streams & batches & mismatched edges \\
 \midrule
+Synthetic matrix ($\times$3 code paths) & 24 & 960 & 0 \\
 Real graphs & 8 & -- & 0 \\
 \bottomrule
 \end{tabular}
