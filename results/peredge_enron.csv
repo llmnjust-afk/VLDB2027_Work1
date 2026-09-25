@@ -1,0 +1,7 @@
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+enron,peredge,1,-,enron_b1_p0.5,1,20000,0,0.114,201.550,10.0775,0.0009,27.2659,1197.8084,99.2,226839771,0,0,155423,72,1,0.112,184182,36692
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+enron,peredge,1,-,enron_b1_p0.5,1,20000,0,0.114,195.212,9.7605,0.0022,26.8393,1175.3589,102.5,226839771,0,0,155423,74,1,0.139,184182,36692
+enron,peredge,1,-,enron_b1_p0.5,1,20000,1,0.125,202.436,10.1217,0.0008,27.3023,1638.8222,98.8,226839771,0,0,155423,74,1,0.112,184182,36692
+enron,peredge,1,-,enron_b1_p0.5,1,20000,2,0.112,199.986,9.9992,0.0008,27.3471,1365.8687,100.0,226839771,0,0,155423,74,1,0.116,184182,36692
+enron,peredge,1,-,enron_b1_p0.5,1,20000,3,0.147,198.577,9.9288,0.0008,27.1248,1329.7600,100.7,226839771,0,0,155423,74,1,0.104,184182,36692

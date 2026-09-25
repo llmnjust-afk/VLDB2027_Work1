@@ -1,35 +1,44 @@
 # VLDB2027_Work1 — Batch-Aware Parallel k-Truss Maintenance on Dynamic Graphs
 
-Paper-in-progress code for *Batch-Aware Parallel Maintenance of k-Truss Decomposition on
-Dynamic Graphs* (PVLDB Vol. 20, deadline Oct 1 2026).
+Companion artifact for *Batch-Aware Parallel Maintenance of Exact k-Truss Decomposition
+on Dynamic Graphs* (PVLDB Vol. 20, 2027).
 
 ## Layout
 
 ```
-batchtruss/            our C++ implementation (single binary, header-only library)
-  src/
-    common.h           timing, RNG, StampSet epoch marks, parallel_for, latency stats
-    graph.h            DynGraph: fully dynamic adjacency + open-addressing edge id map
-    truss_static.h     Wang-Chen bucket-peeling static k-truss (index build / ground truth)
-    fixpoint.h         exact local trussness re-evaluation F(e)
-    incremental.h      sequential per-edge incremental maintenance baseline (AFF-style)
-    batch.h            BatchMaintainer: batch-aware two-phase (demote, then promote)
-                       parallel frontier fixpoint  <-- the paper's contribution
-    stream.h           stream generation, synthetic graphs, SNAP temporal splitting
-    main.cpp           CLI: synth|synth2|gen|snap|static|peredge|batch
-    debug_bisect.cpp   differential debugger: verify maintained == recomputed after
-                       every operation (or every batch)
-  Makefile             g++ -O3 -march=native -std=c++17 -pthread
-  data/                small synthetic graphs + generated streams for smoke tests
-baselines/
-  AccTrussDecomposition/   PVLDB'20 static truss baseline suite (WC/ROSS/PKT/MSP/...)
-  batch-dynamic-kcore/     Liu et al. SPAA'22 batch-dynamic k-core (GBBS)
+src/                       our C++ implementation (single binary, header-only library)
+  common.h                 timing, RNG, StampSet epoch marks, parallel_for, latency stats
+  graph.h                  DynGraph: fully dynamic adjacency + open-addressing edge id map
+  truss_static.h           Wang-Chen bucket-peeling static k-truss (index build / ground truth)
+  fixpoint.h               exact local trussness re-evaluation F(e)
+  incremental.h            sequential per-edge incremental maintenance baseline (AFF-style)
+  batch.h                  BatchMaintainer: batch-aware two-phase (demote, then promote)
+                           parallel frontier fixpoint  <-- the paper's contribution
+  stream.h                 stream generation, synthetic graphs, SNAP temporal splitting
+  main.cpp                 CLI: synth|synth2|gen|snap|static|peredge|batch
+  debug_bisect.cpp         differential debugger: verify maintained == recomputed after
+                           every operation (or every batch)
+  batch_v1_backup.h        development history snapshots (unused by the build)
+  batch_mangled_trash.h
+Makefile                   g++ -O3 -march=native -std=c++17 -pthread -> ./batchtruss
+run_matrix.sh              full experiment driver used for the paper's tables
+scripts/
+  gen_streams.sh           stream generation for all eight graphs (fixed seeds)
+  run_perf.sh              per-configuration runs + static/build index rows
+  plot_results.py          emits every table in paper/tables + fig_regions from results/
+  audit_counts.py          audits the experiment matrix against the paper's protocol
+  supervise.sh             long-run supervision with auto-resume
+baselines/                 third-party baseline suites (see "Baseline repos")
+data/                      small synthetic graphs + generated streams for smoke tests
+results/                   raw per-run CSV rows behind every table in the paper
+paper/                     PVLDB Vol. 20 LaTeX source (acmart + pvldb.sty), final PDF,
+                           tables, figures, refs.bib, CMT registration abstract
 ```
 
 ## Build
 
 ```
-cd batchtruss && make
+make
 ```
 
 ## Usage
@@ -50,6 +59,23 @@ Output is one CSV row per run (print header first). `--check-every K` re-verifie
 maintained decomposition against a full static recompute every K batches; the final CSV
 column `verify_ok` is always 1 for a correct run.
 
+## Reproducing the paper
+
+1. `make`
+2. Six smaller graphs (email, wiki-Vote, Enron, Amazon, Gnutella, YouTube) and all
+   ablations: `bash scripts/run_perf.sh` or `bash run_matrix.sh`.
+3. Giants (LiveJournal: 4.8M vertices / 42.8M edges after dedup; Skitter: 1.7M / 11.1M):
+   download `soc-LiveJournal1.txt` and `as-skitter.txt` from SNAP, then `bash
+   scripts/gen_streams.sh` (fixed seeds) to build the final graphs and streams. The
+   giant runs take hours to days at 32 threads; the paper's Section 8 protocol lists
+   every configuration (B=10..10K, p in {0.25, 0.5, 0.75}, three repetitions on the
+   smaller graphs, one on the giant mixed-legs, B=1 dropped on the giants).
+4. Tables + Figure: `python3 scripts/plot_results.py results paper/tables`
+5. Matrix audit: `python3 scripts/audit_counts.py results`
+
+Every published run carries `verify_ok=1` (maintained decomposition checked against
+Wang-Chen static recomputation).
+
 ## Baseline repos
 
 - https://github.com/RapidsAtHKUST/AccTrussDecomposition (PVLDB'20; contains Wang-Chen
@@ -62,5 +88,5 @@ column `verify_ok` is always 1 for a correct run.
 
 ## Status
 
-Work in progress: batch implementation exists; differential testing (bisect) is being
-used to drive correctness to 100% before performance experiments.
+Implementation complete and fully verified. PVLDB Vol. 20 submission finalized (9 pages,
+official acmart + pvldb template; all eight graphs measured; raw results in results/).

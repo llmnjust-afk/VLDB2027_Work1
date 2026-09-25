@@ -1,0 +1,9 @@
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+wikivote,peredge,1,-,wikivote_b1_p0.5,1,20000,0,0.083,1135.129,56.7563,0.0012,947.6452,1259.1585,17.6,1125269369,0,0,92099,31,1,0.083,102993,7115
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+wikivote,peredge,1,-,wikivote_b1_p0.5,1,20000,0,0.076,1143.586,57.1791,0.0012,962.3223,1397.5891,17.5,1125269369,0,0,92099,31,1,0.088,102993,7115
+wikivote,peredge,1,-,wikivote_b1_p0.5,1,20000,1,0.087,1140.245,57.0122,0.0009,962.9755,1310.5412,17.5,1125269369,0,0,92099,31,1,0.081,102993,7115
+wikivote,peredge,1,-,wikivote_b1_p0.5,1,20000,2,0.079,1104.257,55.2128,0.0010,932.0689,1283.6498,18.1,1125269369,0,0,92099,31,1,0.086,102993,7115
+wikivote,peredge,1,-,wikivote_b1_p0.5,1,20000,3,0.090,1113.954,55.6976,0.0010,930.6457,1311.5015,18.0,1125269369,0,0,92099,31,1,0.078,102993,7115
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+wikivote,peredge,1,-,wikivote_s_b1_p0.5,1,50000,0,0.084,2807.606,56.1519,0.0011,1024.6038,1300.7101,17.8,2882874666,0,0,92099,35,1,0.078,110047,7115
