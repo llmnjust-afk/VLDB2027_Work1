@@ -94,15 +94,15 @@ def fmt_mean_std(st, field, nd=2, scale=1.0):
 
 def emit_endtoend(agg, outdir, static_by_g, ref_b="1000", ref_p="0.5"):
     import re
-    lines = ["% E5: end-to-end at T=32, B={}, p={} (per-edge: per-op cost from the B=1 stream, charged x B)".format(ref_b, ref_p)]
+    lines = ["% E5: end-to-end at T=32, B={}, p={} (per-edge: per-op cost from the B=1 stream, charged x B; ratios are PerEdge/Batch and Static/Batch, so values above 1 mean the baseline is more expensive than batch)".format(ref_b, ref_p)]
     lines.append("\\begin{tabular}{lrrrrr}")
     lines.append("\\toprule")
-    lines.append("Graph & Batch & PerEdge & Static & batch/PerEdge & batch/Static \\\\")
+    lines.append("Graph & Batch & PerEdge & Static & PerEdge/Batch & Static/Batch \\\\")
     lines.append("\\midrule")
     for g in GRAPH_ORDER:
         b = agg.get((g, "batch", "full", f"{g}_b{ref_b}_p{ref_p}", "32"))
         pst = None
-        for st in (f"{g}_b1_p{ref_p}", f"{g}_b{ref_b}_p{ref_p}", f"{g}_s_b{ref_b}_p{ref_p}"):
+        for st in (f"{g}_b1_p{ref_p}", f"{g}_s_b1_p{ref_p}", f"{g}_b{ref_b}_p{ref_p}", f"{g}_s_b{ref_b}_p{ref_p}"):
             p = agg.get((g, "peredge", "-", st, "1"))
             if p:
                 pst = st
@@ -248,19 +248,23 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
     by = {}
     for r in rows:
         by.setdefault((r["dataset"], r["method"], r["ablate"], r["stream"], r["threads"]), []).append(r)
-    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (per-edge: per-op cost from the B=1 stream, charged x B)"]
-    lines.append("\\begin{tabular}{lrrrrr}")
+    lines = ["% E2: batch vs no-merge vs per-edge at B=" + ref_b + " p=" + ref_p + " T=32 (per-edge: per-op cost from the B=1 stream, charged x B; the two B=1 columns report per-op costs themselves)"]
+    lines.append("\\begin{tabular}{lrrrrrrr}")
     lines.append("\\toprule")
-    lines.append("Graph & Batch & No-merge & PerEdge & evals (N/B) & evals (P/B) \\\\")
+    lines.append("Graph & Batch & No-merge & PerEdge & $B{=}1$ batch & $B{=}1$ per-edge & evals (N/B) & evals (P/B) \\\\")
     lines.append("\\midrule")
+    def fmt1(v):
+        return f"{v:.2f}" if v >= 0.01 else f"{v:.4g}"
     for g in GRAPH_ORDER:
         s = f"{g}_b{ref_b}_p{ref_p}"
         sp = f"{g}_s_b{ref_b}_p{ref_p}"
         rb = by.get((g, "batch", "full", s, "32"))
         rn = by.get((g, "batch", "nomerge", s, "32"))
         rp = (by.get((g, "peredge", "-", f"{g}_b1_p{ref_p}", "1"))
+              or by.get((g, "peredge", "-", f"{g}_s_b1_p{ref_p}", "1"))
               or by.get((g, "peredge", "-", s, "1"))
               or by.get((g, "peredge", "-", sp, "1")))
+        rb1 = by.get((g, "batch", "full", f"{g}_b1_p{ref_p}", "32"))
         if not any([rb, rn, rp]):
             continue
         def m_ms(rs):
@@ -288,7 +292,9 @@ def emit_singlepass(rows, outdir, ref_b="1000", ref_p="0.5"):
         c1 = f"{bms:.2f}" if bms else "--"
         c2 = f"{nms:.2f}" if nms else "--"
         c3 = f"{pms:.2f}" if pms else "--"
-        lines.append(f"{g} & {c1} & {c2} & {c3} & {nev_ratio} & {pev_ratio} \\\\")
+        c4 = fmt1(m_ms(rb1)) if rb1 else "--"
+        c5 = fmt1(statistics.mean([float(r["lat_mean_ms"]) for r in rp]) / float(rp[0].get("batch_size") or 1)) if rp else "--"
+        lines.append(f"{g} & {c1} & {c2} & {c3} & {c4} & {c5} & {nev_ratio} & {pev_ratio} \\\\")
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     with open(os.path.join(outdir, "tab_singlepass.tex"), "w") as f:
@@ -314,10 +320,6 @@ def emit_correctness(matrix_log, outdir, agg=None):
     lines.append("\\toprule")
     lines.append("Method & streams & batches & mismatched edges \\\\")
     lines.append("\\midrule")
-    counts = {}
-    for meth, _g, _f in rows:
-        counts.setdefault(meth, [0, 0])
-        counts[meth][0] += 1
     import glob as _glob
     nb = {}
     for f in _glob.glob("data/s*_b*_p*.txt"):
@@ -326,13 +328,10 @@ def emit_correctness(matrix_log, outdir, agg=None):
             if line.startswith("B "):
                 c += 1
         nb[os.path.basename(f)] = c
-    names = {"batch": "Batch", "batch-nomerge": "No-merge", "peredge": "Per-edge"}
-    for meth in ["batch", "batch-nomerge", "peredge"]:
-        if meth not in counts:
-            continue
-        streams = counts[meth][0]
-        batches = sum(nb.get(r[2], 0) for r in rows if r[0] == meth)
-        lines.append(f"{names[meth]} & {streams} & {batches:,.0f} & 0 \\\\".replace(",", "\\,"))
+    if rows:
+        streams = sorted({r[2] for r in rows})
+        batches = sum(nb.get(s, 0) for s in streams)
+        lines.append(f"Synthetic matrix ($\\times$3 code paths) & {len(streams)} & {batches:,.0f} & 0 \\\\".replace(",", "\\,"))
     nreal = 0
     if agg:
         for g in GRAPH_ORDER:
@@ -387,7 +386,10 @@ def main(resdir, outdir):
     emit_endtoend(agg, outdir, static_by_g)
     emit_scaling(agg, outdir)
     emit_regions(agg, outdir)
-    emit_fig_regions(rows, outdir)
+    try:
+        emit_fig_regions(rows, outdir)
+    except ImportError:
+        print("fig_regions skipped (matplotlib unavailable)")
     emit_ablation(agg, outdir)
     print(f"wrote tables to {outdir}")
 

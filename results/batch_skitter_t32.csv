@@ -18,3 +18,5 @@ skitter,batch,32,full,skitter_b100_p0.5,100,20,1,38.164,811.055,40552.7531,36226
 skitter,batch,32,full,skitter_b100_p0.5,100,20,2,35.879,792.743,39637.1404,35942.7825,74403.5248,74403.5248,2.5,559262112,0,0,506,3650,1,36.800,11095317,1696415
 dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
 skitter,batch,32,full,skitter_b1000_p0.75,1000,200,0,41.859,15427.980,77139.9013,78869.8537,93819.1868,98702.1423,13.0,9816022260,0,0,1576,3659,1,45.329,11195269,1696415
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+skitter,batch,32,full,skitter_b1_p0.5,1,200,0,34.325,1686.157,8430.7392,0.0309,36855.2310,39362.4254,0.1,1284248217,0,0,38,3637,1,35.364,11096380,1683769

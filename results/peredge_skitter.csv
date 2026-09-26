@@ -1,0 +1,4 @@
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+skitter,peredge,1,-,skitter_b1_p0.5_probe,1,200,0,34.332,5.510,27.5523,0.0014,283.6230,4531.2759,36.3,285600,0,0,38,2421,1,34.360,11096380,1683769
+dataset,method,threads,ablate,stream,batch_size,nbatches,run,build_s,total_maint_s,lat_mean_ms,lat_p50_ms,lat_p99_ms,lat_max_ms,throughput_eps,evals,seeds,rounds,region_max,rss_mb,verify_ok,verify_s,final_m,final_n
+skitter,peredge,1,-,skitter_s_b1_p0.5,1,20000,0,36.194,10350.716,517.5357,0.0237,677.7253,290009.7363,1.9,2043492082,0,0,8393689,2687,1,34.707,11096312,1683769

@@ -1,5 +1,4 @@
-% E5: end-to-end at T=32, B=1000, p=0.5 (per-edge: per-op cost from the B=1 stream, charged x B)
-% Ratio columns are PerEdge/Batch and Static/Batch (advantage of batching; Static/Batch < 1 means recomputation is cheaper).
+% E5: end-to-end at T=32, B=1000, p=0.5 (per-edge: per-op cost from the B=1 stream, charged x B; ratios are PerEdge/Batch and Static/Batch, so values above 1 mean the baseline is more expensive than batch)
 \begin{tabular}{lrrrrr}
 \toprule
 Graph & Batch & PerEdge & Static & PerEdge/Batch & Static/Batch \\
@@ -9,8 +8,8 @@ wikivote & 163.24 & 56275.42 & 68.00 & 344.7$\times$ & 0.4$\times$ \\
 enron & 235.43 & 9952.55 & 89.00 & 42.3$\times$ & 0.4$\times$ \\
 amazon & 39.45 & -- & 400.00 & -- & 10.1$\times$ \\
 youtube & 5685.30 & -- & 4696.00 & -- & 0.8$\times$ \\
-lj & 113751.03 & -- & 72811.00 & -- & 0.6$\times$ \\
+lj & 113751.03 & 94135.70 & 72811.00 & 0.8$\times$ & 0.6$\times$ \\
 gnutella & 0.53 & 0.47 & 34.00 & 0.9$\times$ & 64.3$\times$ \\
-skitter & 60816.68 & -- & 37272.00 & -- & 0.6$\times$ \\
+skitter & 60816.68 & 517535.70 & 37272.00 & 8.5$\times$ & 0.6$\times$ \\
 \bottomrule
 \end{tabular}

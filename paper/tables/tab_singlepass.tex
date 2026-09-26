@@ -1,6 +1,4 @@
-% E2: batch vs no-merge vs per-edge at B=1000 p=0.5 T=32 (per-edge: per-op cost from the B=1 stream, charged x B).
-% The two per-op columns are means over the B=1 p=0.5 T=32 rows of results/batch_*_t32.csv and results/peredge_*.csv
-% (deduped by run id, last wins), added from the archived CSVs so the table backs the B=1 claims in the prose.
+% E2: batch vs no-merge vs per-edge at B=1000 p=0.5 T=32 (per-edge: per-op cost from the B=1 stream, charged x B; the two B=1 columns report per-op costs themselves)
 \begin{tabular}{lrrrrrrr}
 \toprule
 Graph & Batch & No-merge & PerEdge & $B{=}1$ batch & $B{=}1$ per-edge & evals (N/B) & evals (P/B) \\
@@ -9,9 +7,9 @@ email & 94.10 & 23210.29 & 13633.10 & 7.86 & 13.63 & 233.97$\times$ & 81.6$\time
 wikivote & 163.24 & 18717.50 & 56275.42 & 27.18 & 56.28 & 107.94$\times$ & 116.0$\times$ \\
 enron & 235.43 & 21035.20 & 9952.55 & 32.51 & 9.95 & 85.14$\times$ & 14.2$\times$ \\
 amazon & 39.45 & 46.48 & -- & 0.07 & -- & 1.50$\times$ & -- \\
-youtube & 5685.30 & -- & -- & -- & -- & -- & -- \\
-lj & 113751.03 & -- & -- & -- & -- & -- & -- \\
-gnutella & 0.53 & 1.02 & 0.47 & 0.002 & 0.0005 & 1.00$\times$ & 0.5$\times$ \\
-skitter & 60816.68 & -- & -- & -- & -- & -- & -- \\
+youtube & 5685.30 & -- & -- & 201.25 & -- & -- & -- \\
+lj & 113751.03 & -- & 94135.70 & 20754.64 & 94.14 & -- & 0.4$\times$ \\
+gnutella & 0.53 & 1.02 & 0.47 & 0.00182 & 0.000475 & 1.00$\times$ & 0.5$\times$ \\
+skitter & 60816.68 & -- & 517535.70 & 8430.74 & 517.54 & -- & 2.2$\times$ \\
 \bottomrule
 \end{tabular}
