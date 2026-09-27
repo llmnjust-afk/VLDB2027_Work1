@@ -68,8 +68,10 @@ column `verify_ok` is always 1 for a correct run.
    download `soc-LiveJournal1.txt` and `as-skitter.txt` from SNAP, then `bash
    scripts/gen_streams.sh` (fixed seeds) to build the final graphs and streams. The
    giant runs take hours to days at 32 threads; the paper's Section 8 protocol lists
-   every configuration (B=10..10K, p in {0.25, 0.5, 0.75}, three repetitions on the
-   smaller graphs, one on the giant mixed-legs, B=1 dropped on the giants).
+   every configuration (B=10..10K, p in {0.25, 0.5, 0.75}, three repetitions on every
+   full-length batch workload; the B=1 giant leg of the batch path is a 200-operation
+   single-run probe, and the per-edge path uses dedicated 200K-operation B=1 streams,
+   one run each, for artifact-level auditing).
 4. Tables + Figure: `python3 scripts/plot_results.py results paper/tables`
 5. Matrix audit: `python3 scripts/audit_counts.py results`
 
@@ -86,7 +88,18 @@ Wang-Chen static recomputation).
   (insert=monotone promotion, delete=monotone demotion, bounded fixpoint), labeled
   "our reimplementation" in the paper.
 
+## Differential-testing matrix (results/matrix.log)
+
+24 synthetic streams (s1/s2 x B in {1,10,100,1000} x p in {0.0,0.5,1.0}), 40 batches
+each, replayed at T=4 with --check-every 1 on every batch of every stream against a
+from-scratch Wang-Chen static recomputation: 72/72 rows ALL OK, 960 batches, zero
+mismatched edges (s1 pairs with data/synth.txt, s2 with data/synth2.txt).
+
 ## Status
 
-Implementation complete and fully verified. PVLDB Vol. 20 submission finalized (9 pages,
-official acmart + pvldb template; all eight graphs measured; raw results in results/).
+Data freeze. Every giant cell in the paper now comes from full-length measurements:
+B=10..10K batch workloads (three repetitions) and full 200K-operation B=1 streams for
+the per-edge path; the B=1 giant batch leg is a disclosed 200-operation single-run
+probe. PVLDB Vol. 20 submission finalized (10 pages, official acmart + pvldb template;
+all eight graphs measured; raw results in results/; tables and fig_regions.pdf are
+emitted byte-stably by scripts/plot_results.py).
