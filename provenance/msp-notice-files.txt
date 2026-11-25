@@ -1,0 +1,15 @@
+./dependencies/cub/LICENSE.TXT
+./dependencies/libpopcnt/LICENSE
+./dependencies/moderngpu/LICENSE.md
+./dependencies/sparsepp/LICENSE
+./h-idx/bnd/LICENSE.txt
+./h-idx/nd/LICENSE.txt
+./h-idx/pnd/LICENSE.txt
+./h-idx/util/ips4o/LICENSE
+./h-idx/util/sparsepp/LICENSE
+./LICENSE
+./msp/GKlib/LICENSE.txt
+./msp/LICENSE.txt
+./opt-truss-decomp/clique_utils/LICENSE
+./opt-truss-decomp-offload/util/lemire/EWAHBoolArray/LICENSE
+./opt-truss-decomp/util/ips4o/LICENSE

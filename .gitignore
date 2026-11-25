@@ -1,4 +1,8 @@
+/PAT
+/.build/
+/archives/
 batchtruss
+batchtruss-msp
 debug_bisect
 *.o
 *.pyc

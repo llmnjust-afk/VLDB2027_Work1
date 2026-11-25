@@ -1,0 +1,12 @@
+--- a/src/multistage-peeling.cpp
++++ b/src/multistage-peeling.cpp
+@@ -738,7 +738,9 @@
+     /*
+      * Cleanup.
+      */
++#ifndef MSP_NO_HISTOGRAM
+     core_val_histogram(nedges, dgraph->supports, [](int sup) { return -sup - 2; }, true);
++#endif
+     p_dgraph_free(dgraph);
+     gk_free((void **) &edges, LTERM);
+     gk_free((void **) &frontier_buf, LTERM);

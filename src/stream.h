@@ -2,40 +2,52 @@
 #include "truss_static.h"
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
-inline std::vector<std::vector<Op>> load_stream(const std::string& path) {
+inline std::vector<std::vector<Op>> load_stream(const std::string& path,
+                                                uint32_t vertices) {
+  std::ifstream input(path);
+  if (!input) throw std::runtime_error("cannot open stream: " + path);
   std::vector<std::vector<Op>> batches;
-  FILE* f = fopen(path.c_str(), "r");
-  if (!f) {
-    fprintf(stderr, "cannot open stream %s\n", path.c_str());
-    exit(1);
-  }
-  char line[1 << 10];
-  std::vector<Op> cur;
-  while (fgets(line, sizeof(line), f)) {
-    if (line[0] == 'B' || line[0] == 'b') {
-      if (!cur.empty()) {
-        batches.push_back(cur);
-        cur.clear();
-      }
+  std::string line;
+  size_t line_number = 0;
+  uint64_t declared = 0;
+  while (std::getline(input, line)) {
+    ++line_number;
+    std::istringstream fields(line);
+    char code;
+    if (!(fields >> code) || code == '#' || code == '%') continue;
+    auto invalid = [&] {
+      throw std::runtime_error(path + ":" + std::to_string(line_number) +
+                               ": invalid operation, endpoint or batch length");
+    };
+    std::string extra;
+    if (code == 'B' || code == 'b') {
+      if ((!batches.empty() && batches.back().size() != declared) ||
+          !(fields >> declared) || declared > UINT32_MAX || (fields >> extra))
+        invalid();
+      batches.emplace_back();
       continue;
     }
-    if (line[0] != 'I' && line[0] != 'i' && line[0] != 'D' && line[0] != 'd') continue;
     uint64_t u, v;
-    if (sscanf(line + 1, "%lu %lu", &u, &v) != 2) continue;
-    Op op;
-    op.del = (line[0] == 'D' || line[0] == 'd');
-    op.u = (uint32_t)u;
-    op.v = (uint32_t)v;
-    cur.push_back(op);
+    if (batches.empty() || batches.back().size() >= declared ||
+        (code != 'I' && code != 'i' && code != 'D' && code != 'd') ||
+        !(fields >> u >> v) || u >= vertices || v >= vertices || (fields >> extra))
+      invalid();
+    batches.back().push_back({static_cast<uint8_t>(code == 'D' || code == 'd'),
+                              static_cast<uint32_t>(u), static_cast<uint32_t>(v)});
   }
-  if (!cur.empty()) batches.push_back(cur);
-  fclose(f);
+  if (!batches.empty() && batches.back().size() != declared)
+    throw std::runtime_error(path + ": truncated final batch");
   return batches;
 }
 
-inline void save_graph_edgelist(const DynGraph& g, const std::string& path) {
+inline void save_graph_edgelist(const DynGraph& g, const std::string& path,
+                                bool preserve_ids = false) {
   std::ofstream out(path);
+  if (!out) throw std::runtime_error("cannot write graph: " + path);
+  if (preserve_ids)
+    for (uint32_t u = 0; u < g.n; ++u) out << u << " " << u << "\n";
   for (uint32_t u = 0; u < g.n; ++u)
     for (auto& r : g.adj[u])
       if (u < r.nbr) out << u << " " << r.nbr << "\n";
@@ -43,6 +55,7 @@ inline void save_graph_edgelist(const DynGraph& g, const std::string& path) {
 
 inline void save_stream(const std::vector<std::vector<Op>>& batches, const std::string& path) {
   std::ofstream out(path);
+  if (!out) throw std::runtime_error("cannot write stream: " + path);
   for (auto& b : batches) {
     out << "B " << b.size() << "\n";
     for (auto& op : b) out << (op.del ? "D " : "I ") << op.u << " " << op.v << "\n";

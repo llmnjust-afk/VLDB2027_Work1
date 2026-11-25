@@ -1,51 +1,133 @@
 #pragma once
-#include "fixpoint.h"
-#include <atomic>
-#include <mutex>
+#include "batch_updates.h"
+#include "replay.h"
 #include <condition_variable>
 #include <functional>
-#include <thread>
-#include <unordered_set>
-#include <cstdio>
+#include <memory>
+#include <mutex>
 
 struct BatchStats {
   uint64_t evals = 0;
   uint64_t seeds = 0;
   uint64_t rounds = 0;
   uint64_t region_max = 0;
-  uint64_t region_sum = 0;
-  uint64_t deltas = 0;
-  uint64_t del_deltas = 0;
-  uint64_t ins_deltas = 0;
+  uint64_t deleted = 0;
+  uint64_t inserted = 0;
+  uint64_t peels = 0;
+  uint64_t virtual_events = 0;
+  uint64_t parallel_jobs = 0;
+  uint64_t peel_certified_edges = 0;
+  uint64_t peel_scanned_edges = 0;
+  uint64_t peel_scan_degree_sum = 0;
+  uint64_t region_degree_sum = 0;
+};
+
+inline void apply_ordered_updates(DynGraph& graph, const std::vector<Op>& operations,
+                                  BatchStats& stats) {
+  for (const auto& op : operations)
+    if (replay_edge(graph, op)) ++(op.del ? stats.deleted : stats.inserted);
+}
+
+enum class BatchRoute { Fused, Static };
+
+struct BatchPhaseTimes {
+  double coalesce_s = 0;
+  double witness_s = 0;
+  double apply_s = 0;
+  double closure_s = 0;
+  double recount_s = 0;
+  double peel_s = 0;
 };
 
 class BatchMaintainer {
 public:
-  DynGraph& g;
-  std::vector<uint16_t> tau;
-  std::unique_ptr<std::atomic<uint32_t>[]> sup;
-  std::unique_ptr<std::atomic<uint32_t>[]> dcount;
-  uint32_t supcap = 0;
-  uint32_t T;
-  bool ablate_allseeds = false;
-  int64_t watch_eid = -1;
+  std::vector<uint32_t> tau;
   BatchStats stats;
+  bool ablate_allseeds = false;
+  bool certify_low_support = false;
+  bool fuse_closure_recount = false;
+  bool prune_below_four = false;
+  bool record_peel_scans = false;
+  bool record_region_degrees = false;
 
+  BatchMaintainer(DynGraph& graph, uint32_t threads)
+      : g(graph), T(threads ? threads : 1), local(T) {
+    tau = static_truss(g, T, &stamps).tau;
+    ensure_capacity();
+    pool_start();
+  }
+
+  ~BatchMaintainer() { pool_shutdown(); }
+
+  const std::vector<uint32_t>& last_region() const { return region; }
+
+  void apply_batch(const std::vector<Op>& raw, BatchPhaseTimes* phases = nullptr) {
+    PhaseClock clock(phases != nullptr);
+    const auto updates = coalesce_batch_updates(g, raw);
+    if (phases) phases->coalesce_s = clock.lap();
+    apply_delta(updates.deletes, updates.inserts, phases);
+  }
+
+  BatchRoute apply_adaptive(const std::vector<Op>& raw, double& kernel_s) {
+    if (static_checkpoints_left != 0) {
+      --static_checkpoints_left;
+      apply_routed_batch(raw, BatchRoute::Static, kernel_s);
+      return BatchRoute::Static;
+    }
+    apply_routed_batch(raw, BatchRoute::Fused, kernel_s);
+    if (region.size() > g.m / 2) static_checkpoints_left = 8;
+    return BatchRoute::Fused;
+  }
+
+  void apply_routed_batch(const std::vector<Op>& raw, BatchRoute route, double& kernel_s) {
+    if (route == BatchRoute::Static) {
+      apply_ordered_updates(g, raw, stats);
+      const double kernel_start = now_s();
+      tau = static_truss(g, T).tau;
+      kernel_s = now_s() - kernel_start;
+      ++stats.peels;
+      region.clear();
+      return;
+    }
+
+    // Static checkpoints may grow the edge slots or replace tau with a
+    // vector shorter than the already allocated regional scratch arrays.
+    ensure_capacity();
+    tau.resize(mark_capacity);
+    fuse_closure_recount = true;
+    apply_batch(raw);
+  }
+
+  void apply_batch_nomerge(const std::vector<Op>& raw) {
+    for (const auto& op : raw) {
+      if (op.u == op.v) continue;
+      uint64_t key = DynGraph::ekey(op.u, op.v);
+      int64_t eid = g.find(key);
+      if (op.del && eid >= 0) apply_delta({static_cast<uint32_t>(eid)}, {});
+      if (!op.del && eid < 0) apply_delta({}, {key});
+    }
+  }
+
+private:
+  DynGraph& g;
+  uint32_t T;
   std::vector<StampSet> stamps;
-  std::vector<std::vector<uint16_t>> bufs;
-  std::vector<uint8_t> in_next;
-  std::vector<uint8_t> in_reg;
-  std::vector<uint8_t> ub_in;
-  std::unique_ptr<std::atomic<uint8_t>[]> dead_mark;
-  std::vector<uint32_t> psup;
-  std::vector<uint8_t> palive;
-  std::vector<std::vector<uint32_t>> evt_t;
-  std::vector<uint32_t> ubc;
-  std::vector<uint32_t> frontier, next, reg_list;
-  std::vector<std::vector<uint32_t>> chg_e, nxt_t, seeds_t, dl;
-  std::vector<uint64_t> cnt_t;
-  std::vector<std::vector<uint16_t>> chg_v;
-  std::vector<std::vector<std::pair<uint32_t, uint32_t>>> mate_t;
+  std::vector<std::vector<uint32_t>> local;
+  std::vector<uint32_t> region;
+  std::vector<uint64_t> region_degrees;
+  std::vector<uint32_t> support;
+  std::vector<uint8_t> alive;
+  std::vector<uint64_t> triangle_xor;
+  std::vector<uint32_t> low_support_edges;
+  struct SupportOneTriangle {
+    uint32_t edge;
+    uint32_t mate1;
+    uint32_t mate2;
+  };
+  std::vector<std::vector<SupportOneTriangle>> support_one_triangles;
+  std::unique_ptr<std::atomic<uint8_t>[]> marked;
+  size_t mark_capacity = 0;
+  uint32_t static_checkpoints_left = 0;
 
   std::vector<std::thread> pool_ths;
   std::mutex pool_mx;
@@ -107,6 +189,7 @@ public:
       for (uint64_t i = 0; i < count; ++i) body(0, i);
       return;
     }
+    ++stats.parallel_jobs;
     pool_body = body;
     {
       std::lock_guard<std::mutex> lk(pool_mx);
@@ -127,409 +210,264 @@ public:
       std::this_thread::yield();
   }
 
-  BatchMaintainer(DynGraph& graph, uint32_t threads, uint64_t reserve_edges = 0)
-      : g(graph), T(threads ? threads : 1) {
-    uint32_t cap = g.cap_edges;
-    if (reserve_edges) {
-      uint64_t want = (uint64_t)g.cap_edges + reserve_edges + 16;
-      if (want > UINT32_MAX - 1) want = UINT32_MAX - 1;
-      cap = (uint32_t)want;
-      g.reserve_edges(cap);
-    }
-    StaticTruss s = static_truss(g, T, &stamps);
-    tau.assign(cap, 0);
-    for (uint32_t e = 0; e < g.cap_edges; ++e) tau[e] = s.tau[e];
-    sup = std::make_unique<std::atomic<uint32_t>[]>(cap);
-    dcount = std::make_unique<std::atomic<uint32_t>[]>(cap);
-    supcap = cap;
-    for (uint32_t e = 0; e < cap; ++e) {
-      sup[e].store(e < g.cap_edges ? s.sup[e] : 0);
-      dcount[e].store(0);
-    }
-    bufs.resize(T);
-    chg_e.resize(T);
-    chg_v.resize(T);
-    nxt_t.resize(T);
-    seeds_t.resize(T);
-    mate_t.resize(T);
-    dl.resize(T);
-    in_next.assign(cap, 0);
-    in_reg.assign(cap, 0);
-    ub_in.assign(cap, 0);
-    ubc.assign(cap, 0);
-    dead_mark = std::make_unique<std::atomic<uint8_t>[]>(cap);
-    for (uint32_t i = 0; i < cap; ++i) dead_mark[i].store(0, std::memory_order_relaxed);
-    psup.assign(cap, 0);
-    palive.assign(cap, 0);
-    evt_t.resize(T);
-    cnt_t.resize(T);
-    pool_start();
+  void ensure_capacity() {
+    if (g.cap_edges <= mark_capacity) return;
+    mark_capacity = g.eu.size();
+    tau.resize(mark_capacity);
+    marked = std::make_unique<std::atomic<uint8_t>[]>(mark_capacity);
+    for (size_t i = 0; i < mark_capacity; ++i)
+      marked[i].store(0, std::memory_order_relaxed);
+    support.resize(mark_capacity);
+    alive.resize(mark_capacity);
   }
 
-  ~BatchMaintainer() { pool_shutdown(); }
-
-  inline void expand_local(uint32_t tid, uint32_t eid, std::vector<uint8_t>& flags,
-                           std::vector<uint32_t>& out) {
-    uint32_t a = g.eu[eid], b = g.ev[eid];
-    for (auto& r : g.adj[a])
-      if (r.eid != eid && !flags[r.eid]) {
-        flags[r.eid] = 1;
-        out.push_back(r.eid);
-      }
-    for (auto& r : g.adj[b])
-      if (r.eid != eid && !flags[r.eid]) {
-        flags[r.eid] = 1;
-        out.push_back(r.eid);
-      }
+  void mark_once(uint32_t edge, std::vector<uint32_t>& out) {
+    if (!marked[edge].load(std::memory_order_relaxed) &&
+        !marked[edge].exchange(1, std::memory_order_relaxed))
+      out.push_back(edge);
   }
 
-  inline uint32_t eval_wmax_pot(uint32_t u, uint32_t v, StampSet& st) {
-    st.next_epoch();
-    for (auto& r : g.adj[u]) st.mark(r.nbr, r.eid);
-    uint32_t best = 0;
-    for (auto& r : g.adj[v])
-      if (st.test(r.nbr)) {
-        uint32_t e1 = st.marked_eid(r.nbr), e2 = r.eid;
-        uint32_t p1 = in_reg[e1] ? (uint32_t)tau[e1] : sup[e1].load() + 2;
-        uint32_t p2 = in_reg[e2] ? (uint32_t)tau[e2] : sup[e2].load() + 2;
-        uint32_t m = p1 < p2 ? p1 : p2;
-        if (m > best) best = m;
-      }
-    return best;
-  }
+  void apply_delta(const std::vector<uint32_t>& deletes,
+                   const std::vector<uint64_t>& inserts,
+                   BatchPhaseTimes* phases = nullptr) {
+    PhaseClock clock(phases != nullptr);
+    stats.deleted += deletes.size();
+    stats.inserted += inserts.size();
+    for (auto& edges : local) edges.clear();
 
-  void region_closure(std::vector<uint32_t>& seeds, BatchStats& st) {
-    reg_list.clear();
-    for (uint32_t e : seeds) {
-      if (!g.alive(e) || in_reg[e]) continue;
-      in_reg[e] = 1;
-      reg_list.push_back(e);
-    }
-    if (reg_list.size() > st.region_max) st.region_max = reg_list.size();
-    seeds.clear();
-    for (uint32_t e : reg_list) seeds.push_back(e);
-    while (!seeds.empty()) {
-      st.evals += seeds.size();
-      for (uint32_t t = 0; t < T; ++t) nxt_t[t].clear();
-      run_jobs(seeds.size(), [&](uint32_t tid, uint64_t i) {
-        uint32_t eid = seeds[i];
-        uint32_t a = g.eu[eid], b = g.ev[eid];
-        g.common_neighbors(a, b, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-          if (!ub_in[e1]) {
-            ub_in[e1] = 1;
-            nxt_t[tid].push_back(e1);
-          }
-          if (!ub_in[e2]) {
-            ub_in[e2] = 1;
-            nxt_t[tid].push_back(e2);
-          }
-        });
-      });
-      seeds.clear();
-      for (uint32_t t = 0; t < T; ++t)
-        for (uint32_t e : nxt_t[t]) {
-          if (in_reg[e]) continue;
-          in_reg[e] = 1;
-          reg_list.push_back(e);
-          seeds.push_back(e);
-        }
-    }
-    for (uint32_t e : reg_list) ub_in[e] = 0;
-  }
-
-  void region_peel(BatchStats& st) {
-    for (uint32_t t = 0; t < T; ++t) evt_t[t].clear();
-    run_jobs(reg_list.size(), [&](uint32_t tid, uint64_t i) {
-      uint32_t eid = reg_list[i];
-      uint32_t a = g.eu[eid], b = g.ev[eid];
-      cnt_t[tid]++;
-      uint32_t c = 0;
-      g.common_neighbors(a, b, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-        ++c;
-        if (!in_reg[e1] && !dead_mark[e1].load(std::memory_order_relaxed)) {
-          uint8_t exp = 0;
-          if (dead_mark[e1].compare_exchange_strong(exp, 1, std::memory_order_relaxed))
-            evt_t[tid].push_back(e1);
-        }
-        if (!in_reg[e2] && !dead_mark[e2].load(std::memory_order_relaxed)) {
-          uint8_t exp = 0;
-          if (dead_mark[e2].compare_exchange_strong(exp, 1, std::memory_order_relaxed))
-            evt_t[tid].push_back(e2);
-        }
-      });
-      psup[eid] = c;
-    });
-    for (uint32_t t = 0; t < T; ++t) {
-      st.evals += cnt_t[t];
-      cnt_t[t] = 0;
-    }
-    run_jobs(reg_list.size(), [&](uint32_t, uint64_t i) {
-      uint32_t e = reg_list[i];
-      sup[e].store(psup[e]);
-    });
-    std::vector<std::pair<uint32_t, uint32_t>> evs;
-    for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t e : evt_t[t]) evs.push_back({tau[e] >= 2 ? tau[e] - 2 : 0, e});
-    evs.shrink_to_fit();
-    std::sort(evs.begin(), evs.end());
-    size_t evw = 0;
-    for (size_t i = 0; i < evs.size(); ++i) {
-      if (i > 0 && evs[i].second == evs[evw - 1].second) continue;
-      evs[evw++] = evs[i];
-    }
-    evs.resize(evw);
-    for (auto& ev : evs) ub_in[ev.second] = 1;
-    for (uint32_t e : reg_list) palive[e] = 1;
-    for (auto& ev : evs) palive[ev.second] = 1;
-    uint32_t maxsup = 0;
-    for (uint32_t e : reg_list)
-      if (psup[e] > maxsup) maxsup = psup[e];
-    std::vector<std::vector<uint32_t>> buckets(maxsup + 1);
-    for (uint32_t e : reg_list) buckets[psup[e]].push_back(e);
-    uint32_t popped = 0;
-    size_t evptr = 0;
-    StampSet& st0 = stamps[0];
-    for (uint32_t s = 0; s <= maxsup; ++s) {
-      while (evptr < evs.size() && evs[evptr].first == s) {
-        uint32_t X = evs[evptr++].second;
-        palive[X] = 0;
-        st.evals++;
-        uint32_t a = g.eu[X], b = g.ev[X];
-        st0.next_epoch();
-        for (auto& r : g.adj[a]) st0.mark(r.nbr, r.eid);
-        for (auto& r : g.adj[b]) {
-          if (!st0.test(r.nbr)) continue;
-          uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
-          uint32_t mm[2] = {e1, e2};
-          for (uint32_t mi = 0; mi < 2; ++mi) {
-            uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
-            psup[m]--;
-            buckets[psup[m]].push_back(m);
-          }
-        }
-      }
-      auto& bkt = buckets[s];
-      for (size_t i = 0; i < bkt.size(); ++i) {
-        uint32_t eid = bkt[i];
-        if (!palive[eid] || psup[eid] != s) continue;
-        tau[eid] = (uint16_t)(s + 2);
-        palive[eid] = 0;
-        popped++;
-        st.evals++;
-        uint32_t a = g.eu[eid], b = g.ev[eid];
-        st0.next_epoch();
-        for (auto& r : g.adj[a]) st0.mark(r.nbr, r.eid);
-        for (auto& r : g.adj[b]) {
-          if (!st0.test(r.nbr)) continue;
-          uint32_t e1 = st0.marked_eid(r.nbr), e2 = r.eid;
-          bool d1 = in_reg[e1] ? !palive[e1] : (ub_in[e1] ? !palive[e1] : (tau[e1] < (uint16_t)(s + 2)));
-          bool d2 = in_reg[e2] ? !palive[e2] : (ub_in[e2] ? !palive[e2] : (tau[e2] < (uint16_t)(s + 2)));
-          if (d1 || d2) continue;
-          uint32_t mm[2] = {e1, e2};
-          for (uint32_t mi = 0; mi < 2; ++mi) {
-            uint32_t m = mm[mi];
-            if (!in_reg[m] || psup[m] <= s) continue;
-            psup[m]--;
-            buckets[psup[m]].push_back(m);
-          }
-        }
-      }
-    }
-    if (popped != reg_list.size()) {
-      fprintf(stderr, "region peel incomplete: popped=%u region=%zu\n", popped, reg_list.size());
-      exit(1);
-    }
-    for (uint32_t e : reg_list) palive[e] = 0;
-    for (auto& ev : evs) {
-      palive[ev.second] = 0;
-      ub_in[ev.second] = 0;
-      dead_mark[ev.second].store(0, std::memory_order_relaxed);
-    }
-  }
-
-  bool apply_batch(const std::vector<Op>& raw) {
-    std::unordered_set<uint64_t> delset, insset;
-    for (auto& op : raw) {
-      if (op.u == op.v) continue;
-      uint64_t k = DynGraph::ekey(op.u, op.v);
-      if (op.del) {
-        if (g.has(op.u, op.v)) delset.insert(k);
-      } else {
-        if (!g.has(op.u, op.v)) insset.insert(k);
-      }
-    }
-    std::vector<uint32_t> dels;
-    for (uint64_t k : delset) {
-      if (insset.count(k)) continue;
-      int64_t eid = g.find(k);
-      if (eid >= 0) dels.push_back((uint32_t)eid);
-    }
-    std::vector<std::pair<uint32_t, uint32_t>> ins;
-    for (uint64_t k : insset) {
-      if (delset.count(k)) continue;
-      ins.push_back({(uint32_t)(k >> 32), (uint32_t)(k & 0xffffffffULL)});
-    }
-    stats.deltas += dels.size() + ins.size();
-    stats.del_deltas += dels.size();
-    stats.ins_deltas += ins.size();
-    if (!dels.empty()) phase_deletions(dels);
-    if (!ins.empty()) phase_insertions(ins);
-    return true;
-  }
-
-  bool apply_batch_nomerge(const std::vector<Op>& raw) {
-    bool ok = true;
-    for (auto& op : raw) {
-      std::vector<Op> one = {op};
-      ok = apply_batch(one) && ok;
-    }
-    return ok;
-  }
-
-  void phase_deletions(std::vector<uint32_t>& dels) {
-    for (uint32_t t = 0; t < T; ++t) seeds_t[t].clear();
-    for (uint32_t e : dels) dead_mark[e].store(1, std::memory_order_relaxed);
-    run_jobs(dels.size(), [&](uint32_t tid, uint64_t i) {
-      uint32_t e = dels[i];
-      if (!g.alive(e)) return;
-      uint32_t u = g.eu[e], v = g.ev[e];
+    // Deletion witnesses must be collected on the pre-update graph.
+    run_jobs(deletes.size(), [&](uint32_t tid, uint64_t i) {
+      uint32_t edge = deletes[i];
+      uint32_t u = g.eu[edge], v = g.ev[edge];
       g.common_neighbors(u, v, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-        if ((dead_mark[e1].load(std::memory_order_relaxed) && e1 < e) || (dead_mark[e2].load(std::memory_order_relaxed) && e2 < e)) return;
-        uint32_t o1 = sup[e1].fetch_sub(1);
-        uint32_t o2 = sup[e2].fetch_sub(1);
-        if (o1 == 0 || o2 == 0) {
-          fprintf(stderr, "support underflow\n");
-          exit(1);
-        }
-        seeds_t[tid].push_back(e1);
-        seeds_t[tid].push_back(e2);
+        mark_once(e1, local[tid]);
+        mark_once(e2, local[tid]);
       });
       if (ablate_allseeds) {
-        for (auto& r : g.adj[u]) seeds_t[tid].push_back(r.eid);
-        for (auto& r : g.adj[v]) seeds_t[tid].push_back(r.eid);
+        for (const auto& ref : g.adj[u]) mark_once(ref.eid, local[tid]);
+        for (const auto& ref : g.adj[v]) mark_once(ref.eid, local[tid]);
       }
     });
-    for (uint32_t e : dels) {
-      if (!g.alive(e)) continue;
-      g.remove_edge(e);
-      tau[e] = 0;
-      sup[e].store(0);
-      dead_mark[e].store(0, std::memory_order_relaxed);
-    }
-    std::vector<uint32_t> seeds;
-    for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t e : seeds_t[t]) seeds.push_back(e);
-    reg_list.clear();
-    region_closure(seeds, stats);
-    region_peel(stats);
-    for (uint32_t e : reg_list) in_reg[e] = 0;
-    reg_list.clear();
+    if (phases) phases->witness_s = clock.lap();
+
+    region.clear();
+    for (auto& edges : local)
+      for (uint32_t edge : edges) marked[edge].store(0, std::memory_order_relaxed);
+    apply_batch_deletions(g, deletes, [&](uint32_t edge) { tau[edge] = 0; });
+    // Filter before adding edges because the graph reuses deleted edge IDs.
+    for (auto& edges : local)
+      for (uint32_t edge : edges)
+        if (g.alive(edge)) region.push_back(edge);
+    apply_batch_insertions(g, inserts, [&](uint32_t edge) { region.push_back(edge); });
+    ensure_capacity();
+    if (phases) phases->apply_s = clock.lap();
+    if (region.empty()) return;
+
+    stats.seeds += region.size();
+    for (uint32_t edge : region) marked[edge].store(1, std::memory_order_relaxed);
+    expand_region();
+    if (phases) phases->closure_s = clock.lap();
+    peel_region(phases);
+    for (uint32_t edge : region) marked[edge].store(0, std::memory_order_relaxed);
   }
 
-  void phase_insertions(std::vector<std::pair<uint32_t, uint32_t>>& ins) {
-    uint64_t B = ins.size();
-    std::vector<uint32_t> neweids(B);
-    for (uint64_t i = 0; i < B; ++i) {
-      uint32_t u = ins[i].first, v = ins[i].second;
-      if (u > v) std::swap(u, v);
-      uint32_t eid;
-      if (!g.free_ids.empty()) {
-        eid = g.free_ids.back();
-        g.free_ids.pop_back();
-      } else {
-        eid = g.cap_edges++;
-        if (eid >= supcap || eid >= g.eu.size()) grow_structures(eid);
-      }
-      g.eu[eid] = u;
-      g.ev[eid] = v;
-      g.slot0[eid] = (uint32_t)g.adj[u].size();
-      g.slot1[eid] = (uint32_t)g.adj[v].size();
-      g.adj[u].push_back({v, eid});
-      g.adj[v].push_back({u, eid});
-      g.hash_insert(DynGraph::ekey(u, v), eid + 1);
-      g.m++;
-      tau[eid] = 0;
-      sup[eid].store(0);
-      in_next[eid] = 0;
-      in_reg[eid] = 0;
-      ub_in[eid] = 0;
-      neweids[i] = eid;
-    }
-    std::vector<uint32_t> wsize(B, 0);
-    for (uint32_t t = 0; t < T; ++t) {
-      mate_t[t].clear();
-      dl[t].clear();
-    }
-    run_jobs(B, [&](uint32_t tid, uint64_t i) {
-      uint32_t eid = neweids[i];
-      uint32_t u = g.eu[eid], v = g.ev[eid];
-      uint32_t cnt = g.common_neighbors(u, v, stamps[tid], [&](uint32_t, uint32_t e1, uint32_t e2) {
-        mate_t[tid].push_back({e1, e2});
+  static uint64_t pack_mates(uint32_t first, uint32_t second) {
+    return (uint64_t(std::min(first, second)) << 32) | std::max(first, second);
+  }
+
+  // Specialize away census work in the standard expansion used by Full.
+  template <bool CollectSupports, bool Certify, bool Prune = false, bool CollectDegrees = false>
+  void expand_frontier(size_t begin, size_t end) {
+    run_jobs(end - begin, [&](uint32_t tid, uint64_t i) {
+      uint32_t edge = region[begin + i];
+      uint32_t u = g.eu[edge], v = g.ev[edge];
+      if constexpr (CollectDegrees)
+        region_degrees[tid] += uint64_t(g.adj[u].size()) + g.adj[v].size();
+      SupportOneTriangle triangle{edge, 0, 0};
+      uint64_t signature = 0;
+      uint32_t count = g.common_neighbors(u, v, stamps[tid],
+                                          [&](uint32_t, uint32_t mate1, uint32_t mate2) {
+        mark_once(mate1, local[tid]);
+        mark_once(mate2, local[tid]);
+        if constexpr (Certify) {
+          triangle.mate1 = mate1;
+          triangle.mate2 = mate2;
+        }
+        if constexpr (Prune) signature ^= pack_mates(mate1, mate2);
       });
-      wsize[i] = cnt;
+      // This scan runs once for each closure edge on the immutable final
+      // graph, so its count matches a separate support recount on that graph.
+      if constexpr (Prune) {
+        support[edge] = count;
+        triangle_xor[edge] = signature;
+        alive[edge] = count != 0;
+        if (!alive[edge]) tau[edge] = 2;
+      } else if constexpr (Certify) {
+        save_certified_support(tid, count, triangle);
+      } else if constexpr (CollectSupports) {
+        support[edge] = count;
+        alive[edge] = 1;
+      }
     });
-    run_jobs(B, [&](uint32_t, uint64_t i) { sup[neweids[i]].store(wsize[i]); });
-    std::vector<std::pair<uint32_t, uint32_t>> allmates;
-    for (uint32_t t = 0; t < T; ++t)
-      for (auto& p : mate_t[t]) allmates.push_back(p);
-    uint64_t M = allmates.size();
-    run_jobs(M, [&](uint32_t, uint64_t i) {
-      dcount[allmates[i].first].store(0);
-      dcount[allmates[i].second].store(0);
-    });
-    run_jobs(M, [&](uint32_t, uint64_t i) {
-      sup[allmates[i].first].fetch_add(1);
-      sup[allmates[i].second].fetch_add(1);
-      dcount[allmates[i].first].fetch_add(1);
-      dcount[allmates[i].second].fetch_add(1);
-    });
-    reg_list.clear();
-    std::vector<uint32_t> seeds;
-    for (uint64_t i = 0; i < B; ++i) seeds.push_back(neweids[i]);
-    run_jobs(M, [&](uint32_t tid, uint64_t i) {
-      uint32_t f = allmates[i].first;
-      if (dcount[f].load() > 0) dl[tid].push_back(f);
-      f = allmates[i].second;
-      if (dcount[f].load() > 0) dl[tid].push_back(f);
-    });
-    for (uint32_t t = 0; t < T; ++t)
-      for (uint32_t f : dl[t]) seeds.push_back(f);
-    region_closure(seeds, stats);
-    region_peel(stats);
-    for (uint32_t e : reg_list) in_reg[e] = 0;
-    reg_list.clear();
-  }  void grow_structures(uint32_t eid) {
-    size_t nsz = (size_t)std::max<uint64_t>(eid + 1, (g.eu.size() ? g.eu.size() * 2 : 1024));
-    g.eu.resize(nsz, UINT32_MAX);
-    g.ev.resize(nsz, UINT32_MAX);
-    g.slot0.resize(nsz, 0);
-    g.slot1.resize(nsz, 0);
-    in_next.resize(nsz, 0);
-    in_reg.resize(nsz, 0);
-    ub_in.resize(nsz, 0);
-    ubc.resize(nsz, 0);
-    dead_mark = std::make_unique<std::atomic<uint8_t>[]>(nsz);
-    for (uint32_t i = 0; i < nsz; ++i) dead_mark[i].store(0, std::memory_order_relaxed);
-    psup.resize(nsz, 0);
-    palive.resize(nsz, 0);
-    tau.resize(nsz, 0);
-    auto nsup = std::make_unique<std::atomic<uint32_t>[]>(nsz);
-    auto ndc = std::make_unique<std::atomic<uint32_t>[]>(nsz);
-    for (size_t e = 0; e < nsz; ++e) {
-      if (e < supcap) {
-        nsup[e].store(sup[e].load());
-        ndc[e].store(dcount[e].load());
+  }
+
+  void expand_region() {
+    if (fuse_closure_recount && certify_low_support) prepare_support_one_triangles();
+    if (prune_below_four) triangle_xor.resize(mark_capacity);
+    if (record_region_degrees) region_degrees.assign(T, 0);
+    size_t begin = 0;
+    while (begin < region.size()) {
+      size_t end = region.size();
+      ++stats.rounds;
+      stats.evals += end - begin;
+      for (auto& edges : local) edges.clear();
+      if (prune_below_four) {
+        if (record_region_degrees) expand_frontier<true, false, true, true>(begin, end);
+        else expand_frontier<true, false, true>(begin, end);
+      } else if (fuse_closure_recount) {
+        if (certify_low_support) expand_frontier<true, true>(begin, end);
+        else if (record_region_degrees) expand_frontier<true, false, false, true>(begin, end);
+        else expand_frontier<true, false>(begin, end);
       } else {
-        nsup[e].store(0);
-        ndc[e].store(0);
+        expand_frontier<false, false>(begin, end);
+      }
+      for (auto& edges : local) region.insert(region.end(), edges.begin(), edges.end());
+      begin = end;
+    }
+    if (record_region_degrees)
+      for (uint64_t subtotal : region_degrees) stats.region_degree_sum += subtotal;
+    stats.region_max = std::max<uint64_t>(stats.region_max, region.size());
+  }
+
+  void prepare_support_one_triangles() {
+    support_one_triangles.resize(T);
+    for (auto& triangles : support_one_triangles) triangles.clear();
+  }
+
+  void save_certified_support(uint32_t tid, uint32_t count,
+                              const SupportOneTriangle& triangle) {
+    uint32_t edge = triangle.edge;
+    support[edge] = count;
+    // A triangle gives its edges a lower bound of 3. Raw support 0 or 1
+    // makes support + 2 the exact label without an adjacency scan in the peel.
+    alive[edge] = count >= 2;
+    if (!alive[edge]) tau[edge] = count + 2;
+    if (count == 1) support_one_triangles[tid].push_back(triangle);
+  }
+
+  void recount_region() {
+    if (certify_low_support) {
+      prepare_support_one_triangles();
+      run_jobs(region.size(), [&](uint32_t tid, uint64_t i) {
+        uint32_t edge = region[i];
+        SupportOneTriangle triangle{edge, 0, 0};
+        uint32_t count = g.common_neighbors(g.eu[edge], g.ev[edge], stamps[tid],
+                                            [&](uint32_t, uint32_t mate1, uint32_t mate2) {
+          triangle.mate1 = mate1;
+          triangle.mate2 = mate2;
+        });
+        save_certified_support(tid, count, triangle);
+      });
+      return;
+    }
+    run_jobs(region.size(), [&](uint32_t tid, uint64_t i) {
+      uint32_t edge = region[i];
+      support[edge] = g.common_neighbors(g.eu[edge], g.ev[edge], stamps[tid],
+                                        [](uint32_t, uint32_t, uint32_t) {});
+      alive[edge] = 1;
+    });
+  }
+
+  void remove_certified_triangles() {
+    for (const auto& triangles : support_one_triangles) {
+      for (const auto& triangle : triangles) {
+        const auto [edge, mate1, mate2] = triangle;
+        // All initially certified edges have been marked dead. Assign each
+        // triangle to the lowest-ID certified edge so it affects live mates once.
+        if ((!alive[mate1] && mate1 < edge) || (!alive[mate2] && mate2 < edge)) continue;
+        for (uint32_t mate : {mate1, mate2})
+          if (alive[mate] && support[mate] > 1) --support[mate];
       }
     }
-    sup = std::move(nsup);
-    dcount = std::move(ndc);
-    supcap = (uint32_t)nsz;
+  }
+
+  void prune_to_four_truss() {
+    low_support_edges.clear();
+    for (uint32_t edge : region)
+      if (support[edge] == 1) low_support_edges.push_back(edge);
+
+    // Live supports and XOR signatures describe the same residual triangles.
+    // A support-one edge exposes its last two mates without an intersection.
+    for (size_t i = 0; i < low_support_edges.size(); ++i) {
+      const uint32_t edge = low_support_edges[i];
+      alive[edge] = 0;
+      tau[edge] = 3;  // All queued edges had positive support in the final graph.
+      if (support[edge] == 0) continue;
+      const uint64_t signature = triangle_xor[edge];
+      const uint32_t mate1 = uint32_t(signature >> 32), mate2 = uint32_t(signature);
+      const auto remove_triangle = [&](uint32_t mate, uint32_t other) {
+        triangle_xor[mate] ^= pack_mates(edge, other);
+        if (--support[mate] == 1) low_support_edges.push_back(mate);
+      };
+      remove_triangle(mate1, mate2);
+      remove_triangle(mate2, mate1);
+    }
+  }
+
+  void peel_region(BatchPhaseTimes* phases) {
+    PhaseClock clock(phases != nullptr);
+    ++stats.peels;
+    const bool recount = !fuse_closure_recount && !prune_below_four;
+    if (recount) {
+      recount_region();
+      if (phases) phases->recount_s = clock.lap();
+    } else if (phases) {
+      phases->recount_s = 0;
+    }
+    if (prune_below_four) prune_to_four_truss();
+    else if (certify_low_support) remove_certified_triangles();
+
+    uint32_t max_support = 0;
+    for (uint32_t edge : region) max_support = std::max(max_support, support[edge]);
+    std::vector<std::vector<uint32_t>> buckets(max_support + 1);
+    uint64_t scanned_edges = region.size();
+    if (certify_low_support || prune_below_four) {
+      scanned_edges = 0;
+      for (uint32_t edge : region) {
+        if (!alive[edge]) continue;
+        buckets[support[edge]].push_back(edge);
+        ++scanned_edges;
+      }
+    } else {
+      for (uint32_t edge : region) buckets[support[edge]].push_back(edge);
+    }
+    stats.evals += scanned_edges;
+    if (recount) stats.evals += region.size();
+    if (record_peel_scans) {
+      stats.peel_certified_edges += region.size() - scanned_edges;
+      stats.peel_scanned_edges += scanned_edges;
+      for (uint32_t edge : region)
+        if (alive[edge])
+          stats.peel_scan_degree_sum += uint64_t(g.adj[g.eu[edge]].size()) + g.adj[g.ev[edge]].size();
+    }
+
+    for (uint32_t level = 0; level <= max_support; ++level) {
+      for (size_t i = 0; i < buckets[level].size(); ++i) {
+        uint32_t edge = buckets[level][i];
+        if (!alive[edge] || support[edge] != level) continue;
+        tau[edge] = level + 2;
+        alive[edge] = 0;
+        g.common_neighbors(g.eu[edge], g.ev[edge], stamps[0],
+                           [&](uint32_t, uint32_t e1, uint32_t e2) {
+          if (!alive[e1] || !alive[e2]) return;
+          for (uint32_t mate : {e1, e2})
+            if (support[mate] > level)
+              buckets[--support[mate]].push_back(mate);
+        });
+      }
+    }
+    // Every triangle touching the closed region is internal, so this sweep
+    // has no external removals to schedule as virtual events.
+    if (phases) phases->peel_s = clock.lap();
   }
 };

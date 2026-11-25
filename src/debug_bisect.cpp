@@ -1,6 +1,7 @@
 #include "batch.h"
 #include "incremental.h"
 #include "stream.h"
+#include "replay.h"
 #include <cstring>
 
 int main(int argc, char** argv) {
@@ -19,7 +20,7 @@ int main(int argc, char** argv) {
     if (a[i] == "--threads") nthreads = (uint32_t)atoll(a[i + 1].c_str());
   }
   DynGraph g = DynGraph::load(graph_path);
-  auto stream = load_stream(stream_path);
+  auto stream = load_stream(stream_path, g.n);
   StaticTruss base = static_truss(g, nthreads);
   uint32_t tmax = 0;
   for (uint32_t e = 0; e < g.cap_edges; ++e)
@@ -30,27 +31,21 @@ int main(int argc, char** argv) {
   BatchMaintainer* bm = nullptr;
   PerEdgeMaintainer* pm = nullptr;
   if (batch_mode) {
-    uint64_t reserve = 0;
-    for (auto& b : stream)
-      for (auto& op : b)
-        if (!op.del) reserve++;
-    bm = new BatchMaintainer(g, nthreads, reserve);
-    if (wu != UINT32_MAX) {
-      int64_t we = g.find(DynGraph::ekey(wu, wv));
-      if (we >= 0) { bm->watch_eid = we; }
-    }
+    bm = new BatchMaintainer(g, nthreads);
   } else {
     pm = new PerEdgeMaintainer(g);
     if (wu != UINT32_MAX) {
       int64_t we = g.find(DynGraph::ekey(wu, wv));
       if (we >= 0) { WATCH_EID = we; }
-      fprintf(stderr, "[trace] watch eid=%lld\n", we);
+      fprintf(stderr, "[trace] watch eid=%lld\n", static_cast<long long>(we));
     }
   }
 
+  ReplayOracle oracle(g);
+  size_t batch_number = 0;
   StampSet wst;
   wst.init(g.n);
-  std::vector<uint16_t> wmbuf;
+  std::vector<uint32_t> wmbuf;
   auto watch = [&](const char* tag) {
     if (wu == UINT32_MAX) return;
     int64_t we = g.find(DynGraph::ekey(wu, wv));
@@ -58,92 +53,32 @@ int main(int argc, char** argv) {
       printf("watch (%u,%u): absent %s\n", wu, wv, tag);
       return;
     }
-    uint16_t mt = eval_trussness(wu, wv, g, batch_mode ? bm->tau : pm->tau, wst, wmbuf);
-    uint16_t cur = batch_mode ? bm->tau[we] : pm->tau[we];
+    uint32_t mt = eval_trussness(wu, wv, g, batch_mode ? bm->tau : pm->tau, wst, wmbuf);
+    uint32_t cur = batch_mode ? bm->tau[we] : pm->tau[we];
     printf("watch (%u,%u): tau=%u F=%u %s\n", wu, wv, cur, mt, tag);
   };
 
-  auto check = [&](const char* tag, uint64_t opi, const Op* op) -> bool {
-    StaticTruss s = static_truss(g, 1);
-    for (uint32_t e = 0; e < g.cap_edges; ++e) {
-      if (!g.alive(e)) continue;
-      uint16_t got = batch_mode ? bm->tau[e] : pm->tau[e];
-      if (got != s.tau[e]) {
-        printf("FAIL after %s op#%llu", tag, (unsigned long long)opi);
-        if (op) printf(" (%c %u %u)", op->del ? 'D' : 'I', op->u, op->v);
-        printf(": eid=%u (%u,%u) maintained=%u truth=%u\n", e, g.eu[e], g.ev[e], got, s.tau[e]);
-        uint32_t u = g.eu[e], v = g.ev[e];
-        wst.next_epoch();
-        for (auto& r : g.adj[u]) wst.mark(r.nbr, r.eid);
-        printf("  witnesses (maintained tau | truth):");
-        for (auto& r : g.adj[v])
-          if (wst.test(r.nbr)) {
-            uint32_t e1 = wst.marked_eid(r.nbr), e2 = r.eid;
-            printf(" w=%u:(%u,%u)|(%u,%u)", r.nbr,
-                   batch_mode ? bm->tau[e1] : pm->tau[e1], batch_mode ? bm->tau[e2] : pm->tau[e2],
-                   s.tau[e1], s.tau[e2]);
-          }
-        printf("\n");
-        return false;
+  for (const auto& batch : stream) {
+    ++batch_number;
+    if (!batch_mode) {
+      for (const auto& op : batch) {
+        if (op.del) pm->remove(op.u, op.v);
+        else pm->insert(op.u, op.v);
       }
+    } else if (method == "batch-nomerge") {
+      bm->apply_batch_nomerge(batch);
+    } else {
+      bm->apply_batch(batch);
     }
-    return true;
-  };
-
-  if (!batch_mode) {
-    uint64_t opi = 0;
-    uint64_t vcount = 0;
-    for (auto& b : stream)
-      for (auto& op : b) {
-        if (op.del)
-          pm->remove(op.u, op.v);
-        else
-          pm->insert(op.u, op.v);
-        vcount++;
-        if (check_every && vcount % check_every == 0) {
-          if (!check("peredge", opi, &op)) return 1;
-        }
-        watch("after peredge op");
-        opi++;
-      }
-    if (!check("final", opi, nullptr)) return 1;
-    printf("peredge stats: evals=%llu region_max=%u region_sum=%llu ops=%llu\n",
-           (unsigned long long)pm->stats.evals, pm->stats.region_max,
-           (unsigned long long)pm->stats.region_sum, (unsigned long long)opi);
-  } else {
-    std::vector<uint16_t> prev_tau;
-    uint64_t opi = 0;
-    for (size_t bi = 0; bi < stream.size(); ++bi) {
-      auto& b = stream[bi];
-      if (method == "batch-nomerge") {
-        for (auto& op : b) {
-          if (bm->watch_eid >= 0)
-            fprintf(stderr, "[pre] op#%llu in_reg=%u tau=%u\n", (unsigned long long)opi,
-                    (unsigned)bm->in_reg[bm->watch_eid], (unsigned)bm->tau[bm->watch_eid]);
-          std::vector<Op> one = {op};
-          bm->apply_batch(one);
-          if (!check("batch-nomerge", opi, &op)) return 1;
-          opi++;
-        }
-      } else {
-        uint32_t ch = 0; uint64_t s1 = 0, s2 = 0;
-        for (uint32_t e = 0; e < g.cap_edges; ++e)
-          if (g.alive(e)) s1 += bm->tau[e];
-        bm->apply_batch(b);
-        for (uint32_t e = 0; e < g.cap_edges; ++e)
-          if (g.alive(e)) { s2 += bm->tau[e]; if (e >= prev_tau.size() || bm->tau[e] != prev_tau[e]) ch++; }
-        printf("BATCHSTAT batch %zu size %zu changed_edges=%u tausum %llu->%llu\n", bi, b.size(), ch,
-               (unsigned long long)s1, (unsigned long long)s2);
-        prev_tau.assign(bm->tau.begin(), bm->tau.end());
-        if (!check("batch", opi, &b[0])) {
-          printf("batch index %zu size %zu\n", bi, b.size());
-          for (auto& op : b) printf("  %c %u %u\n", op.del ? 'D' : 'I', op.u, op.v);
-          return 1;
-        }
-        opi += b.size();
-      }
+    oracle.advance(batch);
+    if ((check_every && batch_number % check_every == 0) || batch_number == stream.size()) {
+      const auto& tau = batch_mode ? bm->tau : pm->tau;
+      if (!oracle.check(g, tau, batch_number, batch)) return 1;
     }
+    watch("after batch");
   }
-  printf("ALL OK (%s)\n", method.c_str());
+  delete bm;
+  delete pm;
+  printf("ALL OK (%s, %zu batches)\n", method.c_str(), stream.size());
   return 0;
 }

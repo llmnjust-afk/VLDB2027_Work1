@@ -34,8 +34,7 @@ public:
   }
 
   void reserve_edges(uint32_t cap) {
-    if (cap <= cap_edges) return;
-    cap_edges = cap;
+    if (cap <= eu.size()) return;
     eu.resize(cap, UINT32_MAX);
     ev.resize(cap, UINT32_MAX);
     slot0.resize(cap, 0);

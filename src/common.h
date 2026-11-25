@@ -14,6 +14,22 @@ inline double now_s() {
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+class PhaseClock {
+ public:
+  explicit PhaseClock(bool enabled) : previous_(enabled ? now_s() : 0) {}
+
+  // Called only by profiled replays. Read the clock once at a phase boundary.
+  double lap() {
+    const double current = now_s();
+    const double elapsed = current - previous_;
+    previous_ = current;
+    return elapsed;
+  }
+
+ private:
+  double previous_;
+};
+
 inline uint64_t splitmix64(uint64_t x) {
   x += 0x9e3779b97f4a7c15ULL;
   x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;

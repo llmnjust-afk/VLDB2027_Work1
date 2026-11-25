@@ -3,7 +3,7 @@
 #include "common.h"
 
 struct StaticTruss {
-  std::vector<uint16_t> tau;
+  std::vector<uint32_t> tau;
   std::vector<uint32_t> sup;
 };
 
@@ -82,13 +82,13 @@ inline StaticTruss static_truss(const DynGraph& g, uint32_t nthreads = 1,
     if (g.alive(e)) buckets[sup[e]].push_back(e);
   std::vector<uint8_t> alive(g.cap_edges, 1);
 
-  StampSet st = sts[0];
+  StampSet& st = sts[0];
   for (uint32_t s = 0; s <= maxsup; ++s) {
     auto& b = buckets[s];
     for (size_t i = 0; i < b.size(); ++i) {
       uint32_t eid = b[i];
       if (!alive[eid] || sup[eid] != s) continue;
-      out.tau[eid] = (uint16_t)(s + 2);
+      out.tau[eid] = (uint32_t)(s + 2);
       alive[eid] = 0;
       uint32_t u = g.eu[eid], v = g.ev[eid];
       st.next_epoch();

@@ -16,10 +16,10 @@ static int64_t WATCH_EID = -1;
 class PerEdgeMaintainer {
 public:
   DynGraph& g;
-  std::vector<uint16_t> tau;
+  std::vector<uint32_t> tau;
   std::vector<uint32_t> sup;
   StampSet st;
-  std::vector<uint16_t> mbuf;
+  std::vector<uint32_t> mbuf;
   std::vector<uint32_t> queue;
   std::vector<uint8_t> inq;
   std::vector<uint32_t> ubc;
@@ -66,7 +66,7 @@ public:
       inq[eid] = 0;
       if (!g.alive(eid)) continue;
       stats.evals++;
-      uint16_t nt = eval_trussness(g.eu[eid], g.ev[eid], g, tau, st, mbuf);
+      uint32_t nt = eval_trussness(g.eu[eid], g.ev[eid], g, tau, st, mbuf);
       if ((int64_t)eid == WATCH_EID) {
         fprintf(stderr, "[demote-trace] eid=%u (%u,%u) tau=%u F=%u mbuf:", eid, g.eu[eid], g.ev[eid],
                 (unsigned)tau[eid], (unsigned)nt);
@@ -103,7 +103,7 @@ public:
     }
     uint32_t ce = (W == 0) ? 2u : std::min(W + 2, k0 + 1);
     ubc[eid] = ce;
-    tau[eid] = (uint16_t)ce;
+    tau[eid] = (uint32_t)ce;
     inreg[eid] = 1;
     region.push_back(eid);
     risen.push_back(eid);
@@ -115,7 +115,7 @@ public:
         uint32_t cf = std::min((uint32_t)sup[f] + 2, (uint32_t)tau[f] + 1);
         if (cf > tau[f]) {
           ubc[f] = cf;
-          tau[f] = (uint16_t)cf;
+          tau[f] = (uint32_t)cf;
           inreg[f] = 1;
           region.push_back(f);
           risen.push_back(f);
@@ -129,7 +129,7 @@ public:
         uint32_t cf = std::min((uint32_t)sup[f] + 2, (uint32_t)tau[f] + 1);
         if (cf > tau[f]) {
           ubc[f] = cf;
-          tau[f] = (uint16_t)cf;
+          tau[f] = (uint32_t)cf;
           inreg[f] = 1;
           region.push_back(f);
           inq[f] = 1;
@@ -153,7 +153,7 @@ public:
             uint32_t cf = std::min((uint32_t)sup[me] + 2, (uint32_t)tau[me] + 1);
             if (cf > tau[me]) {
               ubc[me] = cf;
-              tau[me] = (uint16_t)cf;
+              tau[me] = (uint32_t)cf;
               risen.push_back(me);
             }
             region.push_back(me);
